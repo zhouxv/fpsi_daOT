@@ -34,6 +34,7 @@ COPY ./tests /home/tests
 COPY ./build-bench.sh /home/build-bench.sh
 COPY ./build-rls.sh /home/build-rls.sh
 COPY ./build-tests.sh /home/build-tests.sh
+COPY ./run-bench.sh /home/run-bench.sh
 COPY CMakeLists.txt /home/CMakeLists.txt
 
 RUN chmod +x ./*.sh &&\
