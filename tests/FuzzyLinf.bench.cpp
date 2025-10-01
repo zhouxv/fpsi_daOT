@@ -345,7 +345,11 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
       const double nMBsExchanged =                                             \
           ((double)(socks[0].bytesSent() + socks[0].bytesReceived())) /        \
           1024.0 / 1024.0;                                                     \
-      INFO("Number of MBs exchanged: " << nMBsExchanged);                      \
+      static bool communication_printed = false;                               \
+      if (!communication_printed) {                                            \
+        SUCCEED("Number of MBs exchanged: " << nMBsExchanged << " MB");        \
+        communication_printed = true;                                          \
+      }                                                                        \
     };                                                                         \
   }
 

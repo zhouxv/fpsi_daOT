@@ -7,12 +7,12 @@ cmake --build ./build -j
 ```
 
 ```bash
-sudo docker build -t ccs25:latest .
+sudo docker build -t ccs25_balance:latest .
 
-# docker tag ccs25:latest blueobsidian/ccs25:latest
-# docker push blueobsidian/ccs25:latest
+# docker tag ccs25_balance:latest blueobsidian/ccs25_balance:latest
+# docker push blueobsidian/ccs25_balance:latest
 
-sudo docker run -dit --name ccs25_100Mbps --cap-add=NET_ADMIN ccs25:latest
+sudo docker run -dit --name ccs25_balance --cap-add=NET_ADMIN ccs25_balance:latest
 ```
 
 ```

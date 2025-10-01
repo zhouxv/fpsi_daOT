@@ -36,6 +36,8 @@ COPY ./build-rls.sh /home/build-rls.sh
 COPY ./build-tests.sh /home/build-tests.sh
 COPY CMakeLists.txt /home/CMakeLists.txt
 
-RUN chmod +x ./*.sh
-# ./build-bench.sh && \
-# cp ./build/fuzzylinf_bench ./
+RUN chmod +x ./*.sh &&\
+    ./build-bench.sh && \
+    cp ./build/fuzzylinf_bench ./ &&\
+    cp ./build/fuzzyl1_bench ./ &&\
+    cp ./build/fuzzyl2_bench ./

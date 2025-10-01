@@ -1,19 +1,18 @@
-#include "catch2/catch_test_macros.hpp"
-#include "catch2/benchmark/catch_benchmark.hpp"
-#include "cryptoTools/Crypto/PRNG.h"
-#include "cryptoTools/Common/block.h"
-#include "coproto/Socket/LocalAsyncSock.h"
-#include "cryptoTools/Crypto/AES.h"
-#include "../sparseComp/Common/Common.h"
-#include "../sparseComp/Common/HashUtils.h"
 #include "../sparseComp/FuzzyL1/FuzzyL1.h"
-#include <cstdint>
+#include "../sparseComp/Common/Common.h"
+#include "catch2/benchmark/catch_benchmark.hpp"
+#include "catch2/catch_test_macros.hpp"
+#include "coproto/Socket/LocalAsyncSock.h"
+#include "cryptoTools/Common/block.h"
+#include "cryptoTools/Crypto/AES.h"
+#include "cryptoTools/Crypto/PRNG.h"
 #include <array>
-#include <vector>
+#include <cmath>
+#include <cstdint>
 #include <set>
 #include <unordered_map>
 #include <utility>
-#include <cmath>
+#include <vector>
 
 static const int64_t MAX_U8_BIT_VAL = 255;
 static const int64_t MAX_U32_BIT_VAL = 4294967295;
@@ -26,9 +25,9 @@ using PRNG = osuCrypto::PRNG;
 using osuCrypto::block;
 using AES = osuCrypto::AES;
 
+using sparse_comp::hash_point;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
-using sparse_comp::hash_point;
 
 using std::array;
 using std::set;
@@ -38,1279 +37,396 @@ using macoro::sync_wait;
 using macoro::when_all_ready;
 
 template <typename T, size_t n>
-static void shuffle_array(PRNG & prng, array<T, n>& arr) {
+static void shuffle_array(PRNG &prng, array<T, n> &arr) {
 
-    for (size_t i = 0; i < n; i++) {
-        size_t j = prng.get<size_t>() % n;
-        std::swap(arr[i], arr[j]);
-    }
+  for (size_t i = 0; i < n; i++) {
+    size_t j = prng.get<size_t>() % n;
+    std::swap(arr[i], arr[j]);
+  }
 }
 
-template <typename T>
-static void shuffle_vector(PRNG & prng, vector<T> & vec) {
+template <typename T> static void shuffle_vector(PRNG &prng, vector<T> &vec) {
 
-    for (size_t i = 0; i < vec.size(); i++) {
-        size_t j = prng.get<size_t>() % vec.size();
-        std::swap(vec[i], vec[j]);
-    }
-
+  for (size_t i = 0; i < vec.size(); i++) {
+    size_t j = prng.get<size_t>() % vec.size();
+    std::swap(vec[i], vec[j]);
+  }
 }
 
 template <typename T1, typename T2, size_t n>
-static void shuffle_array_pair(PRNG & prng, array<T1, n>& arr1, array<T2, n>& arr2) {
+static void shuffle_array_pair(PRNG &prng, array<T1, n> &arr1,
+                               array<T2, n> &arr2) {
 
-    for (size_t i = 0; i < n; i++) {
-        size_t j = prng.get<size_t>() % n;
-        std::swap(arr1[i], arr1[j]);
-        std::swap(arr2[i], arr2[j]);
-    }
-
+  for (size_t i = 0; i < n; i++) {
+    size_t j = prng.get<size_t>() % n;
+    std::swap(arr1[i], arr1[j]);
+    std::swap(arr2[i], arr2[j]);
+  }
 }
 
 // Picks n random non repeating element in the range [start,end].
-static void pick_rand_from_seq(PRNG &prng, 
-                                size_t start, 
-                                size_t end, 
-                                size_t n, 
-                                vector<size_t> &out) {
-    assert(start <= end);
-    assert(n <= (end - start + 1));
+static void pick_rand_from_seq(PRNG &prng, size_t start, size_t end, size_t n,
+                               vector<size_t> &out) {
+  assert(start <= end);
+  assert(n <= (end - start + 1));
 
-    std::vector<size_t> seq;
+  std::vector<size_t> seq;
 
-    for (size_t i = start; i <= end; i++) {
-        seq.push_back(i);
-    }
-    
-    shuffle_vector(prng, seq);
-    
-    out.resize(n);
+  for (size_t i = start; i <= end; i++) {
+    seq.push_back(i);
+  }
 
-    for (size_t i = 0; i < n; i++) out[i] = seq[i];
+  shuffle_vector(prng, seq);
 
+  out.resize(n);
+
+  for (size_t i = 0; i < n; i++)
+    out[i] = seq[i];
 }
 
-/* Picks n random non repeating receiver points and values and puts them 
+/* Picks n random non repeating receiver points and values and puts them
    in the beginning of the respective sender output arrays*/
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
-static void pick_rand_rcvr_pts(AES& aes, PRNG& prng,
-                                        array<point, tr> & rcvr_sparse_points,
-                                        array<point, ts> & sndr_sparse_points,
-                                        size_t n) {
-    vector<size_t> rand_idxs(n);
-    pick_rand_from_seq(prng, 0, tr - 1, n, rand_idxs);
+static void pick_rand_rcvr_pts(AES &aes, PRNG &prng,
+                               array<point, tr> &rcvr_sparse_points,
+                               array<point, ts> &sndr_sparse_points, size_t n) {
+  vector<size_t> rand_idxs(n);
+  pick_rand_from_seq(prng, 0, tr - 1, n, rand_idxs);
 
-    for (size_t i = 0; i < n; i++) {
-        sndr_sparse_points[i] = rcvr_sparse_points[rand_idxs[i]];
-    }
-
+  for (size_t i = 0; i < n; i++) {
+    sndr_sparse_points[i] = rcvr_sparse_points[rand_idxs[i]];
+  }
 }
 
-template<size_t d>
-static point gen_rand_rcvr_point(PRNG& prng, uint32_t delta) {
-    assert(d <= point::MAX_DIM);
+template <size_t d>
+static point gen_rand_rcvr_point(PRNG &prng, uint32_t delta) {
+  assert(d <= point::MAX_DIM);
 
-    uint32_t lb = 2*delta;
-    uint32_t ub = MAX_U32_BIT_VAL - 2*delta;
+  uint32_t lb = 2 * delta;
+  uint32_t ub = MAX_U32_BIT_VAL - 2 * delta;
 
-    uint32_t c[d];
-    for (size_t i = 0; i < d; i++) {
-        c[i] = (prng.get<uint32_t>() % (ub - lb + 1)) + lb;
-    }
+  uint32_t c[d];
+  for (size_t i = 0; i < d; i++) {
+    c[i] = (prng.get<uint32_t>() % (ub - lb + 1)) + lb;
+  }
 
-    return point(d, c);
+  return point(d, c);
 }
 
 template <size_t tr, size_t d>
-static void samp_rcvr_pts(AES& aes, PRNG & prng, array<point, tr> & rcvr_points, uint8_t delta) {
+static void samp_rcvr_pts(AES &aes, PRNG &prng, array<point, tr> &rcvr_points,
+                          uint8_t delta) {
 
-    assert(d <= point::MAX_DIM);
+  assert(d <= point::MAX_DIM);
 
-    for (size_t i = 0; i < tr; i++) {
-        rcvr_points[i] = gen_rand_rcvr_point<d>(prng, delta);
-    }
-
+  for (size_t i = 0; i < tr; i++) {
+    rcvr_points[i] = gen_rand_rcvr_point<d>(prng, delta);
+  }
 }
 
 template <size_t d, uint8_t delta>
-static void samp_rand_linf_matching_ball(PRNG& prng,
-                                         point& pt) {
-    size_t sizet_delta = (size_t) delta;
-    array<int64_t,d> offsets;
-    std::fill(std::begin(offsets), std::end(offsets), 0);
+static void samp_rand_linf_matching_ball(PRNG &prng, point &pt) {
+  size_t sizet_delta = (size_t)delta;
+  array<int64_t, d> offsets;
+  std::fill(std::begin(offsets), std::end(offsets), 0);
 
-    size_t total_offset = prng.get<size_t>() % (sizet_delta + 1);
+  size_t total_offset = prng.get<size_t>() % (sizet_delta + 1);
 
-    for (size_t i=0;i < total_offset;i++) {
-        size_t j = prng.get<size_t>() % d;
-        offsets[j]++;
-    }
+  for (size_t i = 0; i < total_offset; i++) {
+    size_t j = prng.get<size_t>() % d;
+    offsets[j]++;
+  }
 
-    for (size_t i = 0; i < d; i++) {
-        bool orient = prng.get<bool>();
-        pt[i] = orient ? pt[i] + offsets[i] : pt[i] - offsets[i];
-    }
-
+  for (size_t i = 0; i < d; i++) {
+    bool orient = prng.get<bool>();
+    pt[i] = orient ? pt[i] + offsets[i] : pt[i] - offsets[i];
+  }
 }
 
 template <size_t d, uint8_t delta>
-static array<uint32_t,d> smpl_sndr_rand_val(PRNG& prng) {
-    array<uint32_t,d> pt;
-    
-    for (size_t i = 0; i < d; i++) {
-        pt[i] = prng.get<uint8_t>();
-    }
+static array<uint32_t, d> smpl_sndr_rand_val(PRNG &prng) {
+  array<uint32_t, d> pt;
 
-    return pt;
+  for (size_t i = 0; i < d; i++) {
+    pt[i] = prng.get<uint8_t>();
+  }
+
+  return pt;
 }
 
-template<size_t d>
-static point gen_rand_sndr_point(PRNG& prng) {
-    assert(d <= point::MAX_DIM);
+template <size_t d> static point gen_rand_sndr_point(PRNG &prng) {
+  assert(d <= point::MAX_DIM);
 
-    uint32_t c[d];
-    for (size_t i = 0; i < d; i++) {
-        c[i] = prng.get<uint32_t>();
-    }
+  uint32_t c[d];
+  for (size_t i = 0; i < d; i++) {
+    c[i] = prng.get<uint32_t>();
+  }
 
-    return point(d, c);
+  return point(d, c);
 }
 
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
-static void smpl_sndr_rand_pts(AES& aes, 
-                               PRNG& prng,
+static void smpl_sndr_rand_pts(AES &aes, PRNG &prng,
                                size_t target_num_matching_pts,
-                               array<point, tr> & rcvr_sparse_points,
-                               array<point, ts>& sndr_sparse_points) {
-    // Copies min_num_matching_random bins from rcvr_sparse_points to beginning of sndr_sparse_points.
-    pick_rand_rcvr_pts<tr, ts, d, delta>(aes, prng, rcvr_sparse_points, sndr_sparse_points, target_num_matching_pts);
+                               array<point, tr> &rcvr_sparse_points,
+                               array<point, ts> &sndr_sparse_points) {
+  // Copies min_num_matching_random bins from rcvr_sparse_points to beginning of
+  // sndr_sparse_points.
+  pick_rand_rcvr_pts<tr, ts, d, delta>(aes, prng, rcvr_sparse_points,
+                                       sndr_sparse_points,
+                                       target_num_matching_pts);
 
-    // Randomizes min_num_matching_pts first points in sndr_in_values such that they are within delta of the corresponding points in rcvr_in_values.
-    for (size_t i = 0; i < target_num_matching_pts; i++) {
-        samp_rand_linf_matching_ball<d,delta>(prng, sndr_sparse_points[i]);
-    }
+  // Randomizes min_num_matching_pts first points in sndr_in_values such that
+  // they are within delta of the corresponding points in rcvr_in_values.
+  for (size_t i = 0; i < target_num_matching_pts; i++) {
+    samp_rand_linf_matching_ball<d, delta>(prng, sndr_sparse_points[i]);
+  }
 
-    // Samples the rest of the points in sndr_points such that they are not within delta of the corresponding points in rcvr_points.
-    for (size_t i = target_num_matching_pts; i < ts; i++) {
-        sndr_sparse_points[i] = gen_rand_sndr_point<d>(prng);
-    }
+  // Samples the rest of the points in sndr_points such that they are not within
+  // delta of the corresponding points in rcvr_points.
+  for (size_t i = target_num_matching_pts; i < ts; i++) {
+    sndr_sparse_points[i] = gen_rand_sndr_point<d>(prng);
+  }
 
-    shuffle_array<point,ts>(prng, sndr_sparse_points);
-
+  shuffle_array<point, ts>(prng, sndr_sparse_points);
 }
 
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
 static void gen_constrained_rand_inputs(block seed,
                                         size_t target_num_matching_pts,
-                                        array<point, tr> & rcvr_points,
-                                        array<point, ts> & sndr_points) {
-    assert(target_num_matching_pts <= ts && target_num_matching_pts <= tr);
+                                        array<point, tr> &rcvr_points,
+                                        array<point, ts> &sndr_points) {
+  assert(target_num_matching_pts <= ts && target_num_matching_pts <= tr);
 
-    PRNG prng(seed);
-    AES aes(prng.get<block>());
+  PRNG prng(seed);
+  AES aes(prng.get<block>());
 
-    samp_rcvr_pts<tr,d>(aes, prng, rcvr_points, delta);
+  samp_rcvr_pts<tr, d>(aes, prng, rcvr_points, delta);
 
-    smpl_sndr_rand_pts<tr, ts, d, delta>(aes,
-                                         prng, 
-                                         target_num_matching_pts, 
-                                         rcvr_points, 
-                                         sndr_points);
+  smpl_sndr_rand_pts<tr, ts, d, delta>(aes, prng, target_num_matching_pts,
+                                       rcvr_points, sndr_points);
 }
 
-template<size_t d>
-static bool is_l1_close(point& pt,
-                        point& ball_center, 
-                        uint64_t delta) {
-    int64_t acc_dist = 0;
-    int64_t i64_delta = (int64_t) delta;
+template <size_t d>
+static bool is_l1_close(point &pt, point &ball_center, uint64_t delta) {
+  int64_t acc_dist = 0;
+  int64_t i64_delta = (int64_t)delta;
 
-    for (size_t i = 0; i < d; i++) {
+  for (size_t i = 0; i < d; i++) {
 
-        int64_t i64_pt_i = pt[i];
-        int64_t i64_ball_center_i = ball_center[i];
+    int64_t i64_pt_i = pt[i];
+    int64_t i64_ball_center_i = ball_center[i];
 
-        int64_t dist = std::abs(i64_pt_i - i64_ball_center_i);
+    int64_t dist = std::abs(i64_pt_i - i64_ball_center_i);
 
-        if (dist > i64_delta) {
-            return false;
+    if (dist > i64_delta) {
+      return false;
+    }
+
+    acc_dist += dist;
+  }
+
+  return acc_dist <= i64_delta;
+}
+
+template <size_t tr, size_t ts, size_t d, uint8_t delta>
+static void expected_l1_intersect(AES &aes, array<point, tr> &rcvr_points,
+                                  array<point, ts> &sndr_points,
+                                  vector<point> &intersec) {
+  constexpr const size_t twotod = ((size_t)pow(2, d));
+  constexpr const size_t recvr_cell_count = ((size_t)pow(2, d)) * tr;
+
+  unordered_map<block, size_t> rcvr_pts_hashes;
+
+  std::vector<block> rcvr_stcell_hashes;
+  std::vector<block> sndr_st_hashes;
+
+  sparse_comp::spatial_cell_hash<tr, d, recvr_cell_count>(
+      aes, rcvr_points, rcvr_stcell_hashes, delta);
+  sparse_comp::spatial_hash<ts>(aes, sndr_points, sndr_st_hashes, d, delta);
+
+  for (size_t i = 0; i < tr; i++) {
+    for (size_t j = 0; j < twotod; j++) {
+      rcvr_pts_hashes.insert(
+          std::make_pair(rcvr_stcell_hashes[twotod * i + j], i));
+    }
+  }
+
+  for (size_t i = 0; i < ts; i++) {
+    block hash = sndr_st_hashes[i];
+    if (rcvr_pts_hashes.contains(hash)) {
+      size_t r_idx = rcvr_pts_hashes[hash];
+
+      if (is_l1_close<d>(rcvr_points[r_idx], sndr_points[i], delta)) {
+        intersec.push_back(sndr_points[i]);
+      }
+    }
+  }
+}
+
+template <size_t tr, size_t ts, size_t d, uint8_t delta>
+static void safer_expected_l1_intersect(AES &aes, array<point, tr> &rcvr_points,
+                                        array<point, ts> &sndr_points,
+                                        vector<point> &intersec) {
+  int64_t int64_delta = (int64_t)delta;
+
+  for (size_t i = 0; i < ts; i++) {
+    for (size_t j = 0; j < tr; j++) {
+      int64_t total_dist = 0;
+
+      for (size_t k = 0; k < d; k++) {
+        int64_t sndr_point = ((int64_t)sndr_points[i][k]);
+        int64_t rcvr_point = ((int64_t)rcvr_points[j][k]);
+
+        int64_t dist = std::abs(sndr_point - rcvr_point);
+        if (dist > int64_delta) {
+          total_dist = int64_delta + 1;
+          break;
         }
 
-        acc_dist += dist;
+        total_dist += dist;
+      }
+
+      if (total_dist <= int64_delta) {
+        intersec.push_back(sndr_points[i]);
+        break;
+      }
     }
-
-    return acc_dist <= i64_delta;
-
+  }
 }
 
-template<size_t tr, size_t ts, size_t d, uint8_t delta>
-static void expected_l1_intersect(AES& aes,
-                                    array<point, tr> & rcvr_points,
-                                    array<point, ts> & sndr_points,
-                                    vector<point>& intersec) {
-    constexpr const size_t twotod = ((size_t) pow(2, d));
-    constexpr const size_t recvr_cell_count = ((size_t) pow(2, d)) * tr;
-                                        
-    unordered_map<block,size_t> rcvr_pts_hashes;
+bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
+                         std::vector<point> &expected_intersec) {
 
-    std::vector<block> rcvr_stcell_hashes;
-    std::vector<block> sndr_st_hashes;
+  if (intersec.size() != expected_intersec.size()) {
+    return false;
+  }
 
-    sparse_comp::spatial_cell_hash<tr, d, recvr_cell_count>(aes, rcvr_points, rcvr_stcell_hashes, delta);
-    sparse_comp::spatial_hash<ts>(aes, sndr_points, sndr_st_hashes, d, delta);
+  unordered_map<block, bool> intersec_map;
 
-    for (size_t i=0;i < tr;i++) {
-        for (size_t j=0;j < twotod;j++) {
-            rcvr_pts_hashes.insert(std::make_pair(rcvr_stcell_hashes[twotod*i+j],i));
-        }
+  for (size_t i = 0; i < intersec.size(); i++) {
+    intersec_map.insert(
+        std::make_pair(sparse_comp::hash_point(aes, intersec[i]), true));
+  }
+
+  for (size_t i = 0; i < expected_intersec.size(); i++) {
+    if (!intersec_map.contains(
+            sparse_comp::hash_point(aes, expected_intersec[i]))) {
+      return false;
     }
-                                    
-    for (size_t i = 0; i < ts; i++) {
-        block hash = sndr_st_hashes[i];
-        if (rcvr_pts_hashes.contains(hash)) {
-            size_t r_idx = rcvr_pts_hashes[hash];
+  }
 
-            if (is_l1_close<d>(rcvr_points[r_idx], sndr_points[i], delta)) {
-                intersec.push_back(sndr_points[i]);
-            }
-        }
-    }
-
+  return true;
 }
 
-template<size_t tr, size_t ts, size_t d, uint8_t delta>
-static void safer_expected_l1_intersect(AES& aes,
-                                    array<point, tr> & rcvr_points,
-                                    array<point, ts> & sndr_points,
-                                    vector<point>& intersec) {
-    int64_t int64_delta = (int64_t) delta;
-
-    for (size_t i = 0; i < ts; i++) {
-        for (size_t j = 0; j < tr; j++) {            
-            int64_t total_dist = 0;
-
-            for (size_t k = 0; k < d; k++) {
-                int64_t sndr_point = ((int64_t) sndr_points[i][k]);
-                int64_t rcvr_point = ((int64_t) rcvr_points[j][k]);
-
-                int64_t dist = std::abs(sndr_point - rcvr_point);
-                if (dist > int64_delta) {
-                    total_dist = int64_delta + 1;
-                    break;
-                }
-
-                total_dist += dist;
-            }
-
-            if (total_dist <= int64_delta) {
-                intersec.push_back(sndr_points[i]);
-                break;
-            }
-        }
-    }
-}
-
-bool is_intersec_correct(AES& aes, std::vector<point>& intersec, std::vector<point>& expected_intersec) {
-    
-    if (intersec.size() != expected_intersec.size()) {
-        return false;
-    }
-
-    unordered_map<block, bool> intersec_map;
-
-    for (size_t i = 0; i < intersec.size(); i++) {
-        intersec_map.insert(std::make_pair(sparse_comp::hash_point(aes, intersec[i]), true));
-    }
-
-    for (size_t i = 0; i < expected_intersec.size(); i++) {
-        if (!intersec_map.contains(sparse_comp::hash_point(aes, expected_intersec[i]))) {
-            return false;
-        }
-    }
-
-    return true;
-
-}
-
-
-// START OF TESTS FOR N=M=2^8
-
-TEST_CASE("fuzzyl1 (n=m=256 d=2 delta=10 ssp=40)","[fuzzyl1][n=m=2^8]") {
-
-    BENCHMARK_ADVANCED("n=m=256 d=2 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 256;
-        constexpr size_t TR = 256;
-        constexpr size_t D = 2;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(9536629026107651350ULL,2724119864341290560ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-        
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=256 d=6 delta=10 ssp=40)","[fuzzyl1][n=m=2^8]") {
-
-    BENCHMARK_ADVANCED("n=m=256 d=6 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 256;
-        constexpr size_t TR = 256;
-        constexpr size_t D = 6;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(15356386812547896003ULL,6761862989666286475ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=256 d=10 delta=10 ssp=40)","[fuzzyl1][n=m=2^8]") {
-
-    BENCHMARK_ADVANCED("n=m=256 d=10 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 256;
-        constexpr size_t TR = 256;
-        constexpr size_t D = 10;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(12530778367868389445ULL,3367805040484052022ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-        
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=256 d=2 delta=30 ssp=40)","[fuzzyl1][n=m=2^8]") {
-
-    BENCHMARK_ADVANCED("n=m=256 d=2 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 256;
-        constexpr size_t TR = 256;
-        constexpr size_t D = 2;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(9536629026107651350ULL,2724119864341290560ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=256 d=6 delta=30 ssp=40)","[fuzzyl1][n=m=2^8]") {
-
-    BENCHMARK_ADVANCED("n=m=256 d=6 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 256;
-        constexpr size_t TR = 256;
-        constexpr size_t D = 6;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(15356386812547896003ULL,6761862989666286475ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=256 d=10 delta=30 ssp=40)","[fuzzyl1][n=m=2^8]") {
-
-    BENCHMARK_ADVANCED("n=m=256 d=10 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 256;
-        constexpr size_t TR = 256;
-        constexpr size_t D = 10;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(12530778367868389445ULL,3367805040484052022ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-// END OF TESTS FOR N=M=2^8
-
-// START OF TESTS FOR N=M=2^12
-
-
-TEST_CASE("fuzzyl1 (n=m=4096 d=2 delta=10 ssp=40)","[fuzzyl1][n=m=2^12]") {
-
-    BENCHMARK_ADVANCED("n=m=4096 d=2 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 4096;
-        constexpr size_t TR = 4096;
-        constexpr size_t D = 2;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 103;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(9536629026107651350ULL,2724119864341290560ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=4096 d=6 delta=10 ssp=40)","[fuzzyl1][n=m=2^12]") {
-
-    BENCHMARK_ADVANCED("n=m=4096 d=6 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 4096;
-        constexpr size_t TR = 4096;
-        constexpr size_t D = 6;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 103;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(15356386812547896003ULL,6761862989666286475ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=4096 d=10 delta=10 ssp=40)","[fuzzyl1][n=m=2^12]") {
-
-    BENCHMARK_ADVANCED("n=m=4096 d=10 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 4096;
-        constexpr size_t TR = 4096;
-        constexpr size_t D = 10;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 103;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(12530778367868389445ULL,3367805040484052022ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=4096 d=2 delta=30 ssp=40)","[fuzzyl1][n=m=2^12]") {
-
-    BENCHMARK_ADVANCED("n=m=4096 d=2 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 4096;
-        constexpr size_t TR = 4096;
-        constexpr size_t D = 2;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 103;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(9536629026107651350ULL,2724119864341290560ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=4096 d=6 delta=30 ssp=40)","[fuzzyl1][n=m=2^12]") {
-
-    BENCHMARK_ADVANCED("n=m=4096 d=6 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 4096;
-        constexpr size_t TR = 4096;
-        constexpr size_t D = 6;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 103;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(15356386812547896003ULL,6761862989666286475ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=4096 d=10 delta=30 ssp=40)","[fuzzyl1][n=m=2^12]") {
-
-    BENCHMARK_ADVANCED("n=m=4096 d=10 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 4096;
-        constexpr size_t TR = 4096;
-        constexpr size_t D = 10;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 103;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(12530778367868389445ULL,3367805040484052022ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-
-// END OF TESTS FOR N=M=2^12
-
-// START OF TESTS FOR N=M=2^16
-
-
-TEST_CASE("fuzzyl1 (n=m=65536 d=2 delta=10 ssp=40)","[fuzzyl1][n=m=2^16]") {
-
-    BENCHMARK_ADVANCED("n=m=65536 d=2 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 65536;
-        constexpr size_t TR = 65536;
-        constexpr size_t D = 2;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 17;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(9536629026107651350ULL,2724119864341290560ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=65536 d=6 delta=10 ssp=40)","[fuzzyl1][n=m=2^16]") {
-
-    BENCHMARK_ADVANCED("n=m=65536 d=6 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 65536;
-        constexpr size_t TR = 65536;
-        constexpr size_t D = 6;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 17;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(15356386812547896003ULL,6761862989666286475ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=65536 d=10 delta=10 ssp=40)","[fuzzyl1][n=m=2^16]") {
-
-    BENCHMARK_ADVANCED("n=m=65536 d=10 delta=10 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 65536;
-        constexpr size_t TR = 65536;
-        constexpr size_t D = 10;
-        constexpr size_t DELTA = 10;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 17;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(12530778367868389445ULL,3367805040484052022ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=65536 d=2 delta=30 ssp=40)","[fuzzyl1][n=m=2^16]") {
-
-    BENCHMARK_ADVANCED("n=m=65536 d=2 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 65536;
-        constexpr size_t TR = 65536;
-        constexpr size_t D = 2;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(9536629026107651350ULL,2724119864341290560ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=65536 d=6 delta=30 ssp=40)","[fuzzyl1][n=m=2^16]") {
-
-    BENCHMARK_ADVANCED("n=m=65536 d=6 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 65536;
-        constexpr size_t TR = 65536;
-        constexpr size_t D = 6;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(15356386812547896003ULL,6761862989666286475ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-TEST_CASE("fuzzyl1 (n=m=65536 d=10 delta=30 ssp=40)","[fuzzyl1][n=m=2^16]") {
-
-    BENCHMARK_ADVANCED("n=m=65536 d=10 delta=30 ssp=40")(Catch::Benchmark::Chronometer meter) {
-        constexpr size_t TS = 65536;
-        constexpr size_t TR = 65536;
-        constexpr size_t D = 10;
-        constexpr size_t DELTA = 30;
-        constexpr size_t ssp = 40;
-        size_t target_matching_points = 29;
-
-        auto socks = LocalAsyncSocket::makePair();
-        block seed = block(12530778367868389445ULL,3367805040484052022ULL);
-        PRNG senderPRNG = PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));
-        PRNG receiverPRNG = PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));
-        AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));
-
-        std::array<point, TS>* senderPoints = new std::array<point, TS>();
-        std::array<point, TR>* receiverPoints = new std::array<point, TR>();
-        std::vector<point> intersec;
-
-        gen_constrained_rand_inputs<TR, TS, D, DELTA>(seed,
-                                                      target_matching_points,
-                                                      *receiverPoints,
-                                                      *senderPoints);
-
-        sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(senderPRNG, aes);
-        sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(receiverPRNG, aes);
-    
-        auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);
-        auto receiver_proto = fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);
-    
-        meter.measure([&sender_proto,&receiver_proto]() { sync_wait(when_all_ready(std::move(sender_proto), std::move(receiver_proto))); });
-
-        std::vector<point> expected_intersec;
-
-        expected_l1_intersect<TR, TS, D, DELTA>(aes,
-                                        *receiverPoints,
-                                        *senderPoints,
-                                        expected_intersec);
-    
-        
-    
-        delete senderPoints;
-        delete receiverPoints;
-    
-        REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));
-        REQUIRE(intersec.size() == target_matching_points);
-
-        const double nMBsExchanged = ((double)(socks[0].bytesSent()+socks[0].bytesReceived()))/1024.0/1024.0; 
-
-        SUCCEED("Number of MBs exchanged: " << nMBsExchanged);
-    };
-}
-
-
-// END OF TESTS FOR N=M=2^16
+#define GENERATE_FUZZYL1_TEST(n, m, d, delta)                                  \
+  TEST_CASE("fuzzyl1 (n=m=" #n " d=" #d " delta=" #delta ")",                  \
+            "[fuzzyl1][n=m=" #n "]") {                                         \
+    BENCHMARK_ADVANCED("n=m=" #n " d=" #d " delta=" #delta)(                   \
+        Catch::Benchmark::Chronometer meter) {                                 \
+      constexpr size_t TS = n;                                                 \
+      constexpr size_t TR = m;                                                 \
+      constexpr size_t D = d;                                                  \
+      constexpr size_t DELTA = delta;                                          \
+      constexpr size_t ssp = 40;                                               \
+      size_t target_matching_points = 29;                                      \
+                                                                               \
+      auto socks = LocalAsyncSocket::makePair();                               \
+      block seed = block(9536629026107651350ULL, 2724119864341290560ULL);      \
+      PRNG senderPRNG =                                                        \
+          PRNG(block(15914074867899273501ULL, 6004108516319388444ULL));        \
+      PRNG receiverPRNG =                                                      \
+          PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));         \
+      AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));  \
+                                                                               \
+      std::array<point, TS> *senderPoints = new std::array<point, TS>();       \
+      std::array<point, TR> *receiverPoints = new std::array<point, TR>();     \
+      std::vector<point> intersec;                                             \
+                                                                               \
+      gen_constrained_rand_inputs<TR, TS, D, DELTA>(                           \
+          seed, target_matching_points, *receiverPoints, *senderPoints);       \
+                                                                               \
+      sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(      \
+          senderPRNG, aes);                                                    \
+      sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(     \
+          receiverPRNG, aes);                                                  \
+                                                                               \
+      auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);         \
+      auto receiver_proto =                                                    \
+          fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);           \
+                                                                               \
+      meter.measure([&sender_proto, &receiver_proto]() {                       \
+        sync_wait(when_all_ready(std::move(sender_proto),                      \
+                                 std::move(receiver_proto)));                  \
+      });                                                                      \
+                                                                               \
+      std::vector<point> expected_intersec;                                    \
+                                                                               \
+      expected_l1_intersect<TR, TS, D, DELTA>(                                 \
+          aes, *receiverPoints, *senderPoints, expected_intersec);             \
+                                                                               \
+      delete senderPoints;                                                     \
+      delete receiverPoints;                                                   \
+                                                                               \
+      REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));          \
+      REQUIRE(intersec.size() == target_matching_points);                      \
+                                                                               \
+      const double nMBsExchanged =                                             \
+          ((double)(socks[0].bytesSent() + socks[0].bytesReceived())) /        \
+          1024.0 / 1024.0;                                                     \
+                                                                               \
+      static bool communication_printed = false;                               \
+      if (!communication_printed) {                                            \
+        SUCCEED("Number of MBs exchanged: " << nMBsExchanged << " MB");        \
+        communication_printed = true;                                          \
+      }                                                                        \
+    };                                                                         \
+  }
+
+GENERATE_FUZZYL1_TEST(256, 256, 2, 10)
+GENERATE_FUZZYL1_TEST(256, 256, 2, 30)
+GENERATE_FUZZYL1_TEST(256, 256, 2, 60)
+GENERATE_FUZZYL1_TEST(256, 256, 2, 120)
+GENERATE_FUZZYL1_TEST(256, 256, 2, 250)
+GENERATE_FUZZYL1_TEST(4096, 4096, 2, 10)
+GENERATE_FUZZYL1_TEST(4096, 4096, 2, 30)
+GENERATE_FUZZYL1_TEST(4096, 4096, 2, 60)
+GENERATE_FUZZYL1_TEST(4096, 4096, 2, 120)
+GENERATE_FUZZYL1_TEST(4096, 4096, 2, 250)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 10)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 30)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 60)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 120)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 250)
+
+GENERATE_FUZZYL1_TEST(256, 256, 6, 10)
+GENERATE_FUZZYL1_TEST(256, 256, 6, 30)
+GENERATE_FUZZYL1_TEST(256, 256, 6, 60)
+GENERATE_FUZZYL1_TEST(256, 256, 6, 120)
+GENERATE_FUZZYL1_TEST(256, 256, 6, 250)
+GENERATE_FUZZYL1_TEST(4096, 4096, 6, 10)
+GENERATE_FUZZYL1_TEST(4096, 4096, 6, 30)
+GENERATE_FUZZYL1_TEST(4096, 4096, 6, 60)
+GENERATE_FUZZYL1_TEST(4096, 4096, 6, 120)
+GENERATE_FUZZYL1_TEST(4096, 4096, 6, 250)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 10)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 30)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 60)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 120)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 250)
+
+GENERATE_FUZZYL1_TEST(256, 256, 10, 10)
+GENERATE_FUZZYL1_TEST(256, 256, 10, 30)
+GENERATE_FUZZYL1_TEST(256, 256, 10, 60)
+GENERATE_FUZZYL1_TEST(256, 256, 10, 120)
+GENERATE_FUZZYL1_TEST(256, 256, 10, 250)
+GENERATE_FUZZYL1_TEST(4096, 4096, 10, 10)
+GENERATE_FUZZYL1_TEST(4096, 4096, 10, 30)
+GENERATE_FUZZYL1_TEST(4096, 4096, 10, 60)
+GENERATE_FUZZYL1_TEST(4096, 4096, 10, 120)
+GENERATE_FUZZYL1_TEST(4096, 4096, 10, 250)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 10)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 30)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 60)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 120)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 250)
