@@ -63,14 +63,20 @@ set(HEADERS
 if(BUILD_BENCH)
    set(ALL_BENCHS
         fuzzylinf_bench
+        fuzzylinf_16_bench
         fuzzyl1_bench
+        fuzzyl1_16_bench
         fuzzyl2_bench
     )
 
     set (TEST_SOURCE_PREFIX ${CMAKE_SOURCE_DIR}/tests)
     
     add_executable(fuzzylinf_bench ${TEST_SOURCE_PREFIX}/FuzzyLinf.bench.cpp ${SOURCES})
+    add_executable(fuzzylinf_16_bench ${TEST_SOURCE_PREFIX}/FuzzyLinf_16.bench.cpp ${SOURCES})
+
     add_executable(fuzzyl1_bench ${TEST_SOURCE_PREFIX}/FuzzyL1.bench.cpp ${SOURCES})
+    add_executable(fuzzyl1_16_bench ${TEST_SOURCE_PREFIX}/FuzzyL1_16.bench.cpp ${SOURCES})
+
     add_executable(fuzzyl2_bench ${TEST_SOURCE_PREFIX}/FuzzyL2.bench.cpp ${SOURCES})
 
 

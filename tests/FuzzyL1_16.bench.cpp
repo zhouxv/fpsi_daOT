@@ -1,6 +1,5 @@
-#include "../sparseComp/FuzzyLinf/FuzzyLinf.h"
 #include "../sparseComp/Common/Common.h"
-#include "../sparseComp/Common/HashUtils.h"
+#include "../sparseComp/FuzzyL1/FuzzyL1.h"
 #include "catch2/benchmark/catch_benchmark.hpp"
 #include "catch2/catch_test_macros.hpp"
 #include "coproto/Socket/LocalAsyncSock.h"
@@ -8,19 +7,15 @@
 #include "cryptoTools/Crypto/AES.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include <array>
-#include <catch2/catch_message.hpp>
 #include <cmath>
 #include <cstdint>
 #include <set>
-#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include <coproto/Socket/AsioSocket.h>
-#include <coproto/Socket/LocalAsyncSock.h>
-
-#include <thread>
+static const int64_t MAX_U8_BIT_VAL = 255;
+static const int64_t MAX_U32_BIT_VAL = 4294967295;
 
 using sparse_comp::point;
 
@@ -30,50 +25,23 @@ using PRNG = osuCrypto::PRNG;
 using osuCrypto::block;
 using AES = osuCrypto::AES;
 
+using sparse_comp::hash_point;
+using std::chrono::high_resolution_clock;
+using std::chrono::milliseconds;
+
+using std::array;
 using std::set;
 using std::unordered_map;
 
 using macoro::sync_wait;
 using macoro::when_all_ready;
 
-using sparse_comp::spatial_hash;
+template <typename T, size_t n>
+static void shuffle_array(PRNG &prng, array<T, n> &arr) {
 
-static const int64_t MAX_U8_BIT_VAL = 255;
-static const int64_t MAX_U32_BIT_VAL = 4294967295;
-
-template <size_t d>
-static point gen_rand_rcvr_point(PRNG &prng, uint32_t delta) {
-  assert(d <= point::MAX_DIM);
-
-  uint32_t lb = 2 * delta;
-  uint32_t ub = MAX_U32_BIT_VAL - 2 * delta;
-
-  uint32_t c[d];
-  for (size_t i = 0; i < d; i++) {
-    c[i] = (prng.get<uint32_t>() % (ub - lb + 1)) + lb;
-  }
-
-  return point(d, c);
-}
-
-template <size_t d> static point gen_rand_sndr_point(PRNG &prng) {
-  assert(d <= point::MAX_DIM);
-
-  uint32_t c[d];
-  for (size_t i = 0; i < d; i++) {
-    c[i] = prng.get<uint32_t>();
-  }
-
-  return point(d, c);
-}
-
-template <size_t tr, size_t d>
-static void samp_rcvr_pts(AES &aes, PRNG &prng, array<point, tr> &rcvr_points,
-                          uint8_t delta) {
-  assert(d <= point::MAX_DIM);
-
-  for (size_t i = 0; i < tr; i++) {
-    rcvr_points[i] = gen_rand_rcvr_point<d>(prng, delta);
+  for (size_t i = 0; i < n; i++) {
+    size_t j = prng.get<size_t>() % n;
+    std::swap(arr[i], arr[j]);
   }
 }
 
@@ -85,19 +53,20 @@ template <typename T> static void shuffle_vector(PRNG &prng, vector<T> &vec) {
   }
 }
 
-template <typename T, size_t n>
-static void shuffle_array(PRNG &prng, array<T, n> &arr) {
+template <typename T1, typename T2, size_t n>
+static void shuffle_array_pair(PRNG &prng, array<T1, n> &arr1,
+                               array<T2, n> &arr2) {
 
   for (size_t i = 0; i < n; i++) {
     size_t j = prng.get<size_t>() % n;
-    std::swap(arr[i], arr[j]);
+    std::swap(arr1[i], arr1[j]);
+    std::swap(arr2[i], arr2[j]);
   }
 }
 
 // Picks n random non repeating element in the range [start,end].
 static void pick_rand_from_seq(PRNG &prng, size_t start, size_t end, size_t n,
                                vector<size_t> &out) {
-
   assert(start <= end);
   assert(n <= (end - start + 1));
 
@@ -119,70 +88,107 @@ static void pick_rand_from_seq(PRNG &prng, size_t start, size_t end, size_t n,
    in the beginning of the respective sender output arrays*/
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
 static void pick_rand_rcvr_pts(AES &aes, PRNG &prng,
-                               array<point, tr> &rcvr_points,
-                               array<point, ts> &sndr_points, size_t n) {
+                               array<point, tr> &rcvr_sparse_points,
+                               array<point, ts> &sndr_sparse_points, size_t n) {
   vector<size_t> rand_idxs(n);
   pick_rand_from_seq(prng, 0, tr - 1, n, rand_idxs);
 
   for (size_t i = 0; i < n; i++) {
-    sndr_points[i] = rcvr_points[rand_idxs[i]];
+    sndr_sparse_points[i] = rcvr_sparse_points[rand_idxs[i]];
+  }
+}
+
+template <size_t d>
+static point gen_rand_rcvr_point(PRNG &prng, uint32_t delta) {
+  assert(d <= point::MAX_DIM);
+
+  uint32_t lb = 2 * delta;
+  uint32_t ub = MAX_U32_BIT_VAL - 2 * delta;
+
+  uint32_t c[d];
+  for (size_t i = 0; i < d; i++) {
+    c[i] = (prng.get<uint32_t>() % (ub - lb + 1)) + lb;
+  }
+
+  return point(d, c);
+}
+
+template <size_t tr, size_t d>
+static void samp_rcvr_pts(AES &aes, PRNG &prng, array<point, tr> &rcvr_points,
+                          uint8_t delta) {
+
+  assert(d <= point::MAX_DIM);
+
+  for (size_t i = 0; i < tr; i++) {
+    rcvr_points[i] = gen_rand_rcvr_point<d>(prng, delta);
   }
 }
 
 template <size_t d, uint8_t delta>
 static void samp_rand_linf_matching_ball(PRNG &prng, point &pt) {
+  size_t sizet_delta = (size_t)delta;
+  array<int64_t, d> offsets;
+  std::fill(std::begin(offsets), std::end(offsets), 0);
+
+  size_t total_offset = prng.get<size_t>() % (sizet_delta + 1);
+
+  for (size_t i = 0; i < total_offset; i++) {
+    size_t j = prng.get<size_t>() % d;
+    offsets[j]++;
+  }
 
   for (size_t i = 0; i < d; i++) {
-    uint32_t lb = std::max((int64_t)0, ((int64_t)pt[i]) - ((int64_t)delta));
-    uint32_t ub =
-        std::min(MAX_U32_BIT_VAL, ((int64_t)pt[i]) + ((int64_t)delta));
-
-    pt.coords[i] = (prng.get<uint32_t>() % (ub - lb + 1)) + lb;
+    bool orient = prng.get<bool>();
+    pt[i] = orient ? pt[i] + offsets[i] : pt[i] - offsets[i];
   }
 }
 
 template <size_t d, uint8_t delta>
-static void make_ball_almost_matching(PRNG &prng, point &pt) {
-  int64_t int64_delta = (int64_t)delta;
+static array<uint32_t, d> smpl_sndr_rand_val(PRNG &prng) {
+  array<uint32_t, d> pt;
 
   for (size_t i = 0; i < d; i++) {
-    int64_t mod256_pt_i = ((int64_t)pt[i]) % (MAX_U8_BIT_VAL + 1);
-
-    if (mod256_pt_i - delta - 1 < 0) {
-      pt.coords[i] = MAX_U8_BIT_VAL;
-    } else {
-      pt.coords[i] = 0;
-    }
+    pt[i] = prng.get<uint8_t>();
   }
+
+  return pt;
+}
+
+template <size_t d> static point gen_rand_sndr_point(PRNG &prng) {
+  assert(d <= point::MAX_DIM);
+
+  uint32_t c[d];
+  for (size_t i = 0; i < d; i++) {
+    c[i] = prng.get<uint32_t>();
+  }
+
+  return point(d, c);
 }
 
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
 static void smpl_sndr_rand_pts(AES &aes, PRNG &prng,
                                size_t target_num_matching_pts,
-                               array<point, tr> &rcvr_points,
-                               array<point, ts> &sndr_points) {
-  assert(target_num_matching_pts <= ts && target_num_matching_pts <= tr);
-  assert(d <= point::MAX_DIM);
-
-  // Copies target_num_matching_pts from rcvr_points to beginning of
-  // sndr_points.
-  pick_rand_rcvr_pts<tr, ts, d, delta>(aes, prng, rcvr_points, sndr_points,
+                               array<point, tr> &rcvr_sparse_points,
+                               array<point, ts> &sndr_sparse_points) {
+  // Copies min_num_matching_random bins from rcvr_sparse_points to beginning of
+  // sndr_sparse_points.
+  pick_rand_rcvr_pts<tr, ts, d, delta>(aes, prng, rcvr_sparse_points,
+                                       sndr_sparse_points,
                                        target_num_matching_pts);
 
-  // Randomizes target_num_matching_pts first points in sndr_points such that
-  // they are within delta of the corresponding points in rcvr_points.
+  // Randomizes min_num_matching_pts first points in sndr_in_values such that
+  // they are within delta of the corresponding points in rcvr_in_values.
   for (size_t i = 0; i < target_num_matching_pts; i++) {
-    samp_rand_linf_matching_ball<d, delta>(prng, sndr_points[i]);
+    samp_rand_linf_matching_ball<d, delta>(prng, sndr_sparse_points[i]);
   }
 
   // Samples the rest of the points in sndr_points such that they are not within
   // delta of the corresponding points in rcvr_points.
   for (size_t i = target_num_matching_pts; i < ts; i++) {
-    point pt = gen_rand_sndr_point<d>(prng);
-    sndr_points[i] = pt;
+    sndr_sparse_points[i] = gen_rand_sndr_point<d>(prng);
   }
 
-  shuffle_array<point, ts>(prng, sndr_points);
+  shuffle_array<point, ts>(prng, sndr_sparse_points);
 }
 
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
@@ -202,30 +208,38 @@ static void gen_constrained_rand_inputs(block seed,
 }
 
 template <size_t d>
-inline static bool is_linf_close(point &pt, point &ball_center, int64_t delta) {
+static bool is_l1_close(point &pt, point &ball_center, uint64_t delta) {
+  int64_t acc_dist = 0;
+  int64_t i64_delta = (int64_t)delta;
 
   for (size_t i = 0; i < d; i++) {
-    int64_t dist = std::abs((int64_t)pt[i] - (int64_t)ball_center[i]);
 
-    if (dist > delta) {
+    int64_t i64_pt_i = pt[i];
+    int64_t i64_ball_center_i = ball_center[i];
+
+    int64_t dist = std::abs(i64_pt_i - i64_ball_center_i);
+
+    if (dist > i64_delta) {
       return false;
     }
+
+    acc_dist += dist;
   }
 
-  return true;
+  return acc_dist <= i64_delta;
 }
 
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
-static void expected_linf_intersect(AES &aes, array<point, tr> &rcvr_points,
-                                    array<point, ts> &sndr_points,
-                                    vector<point> &intersec) {
+static void expected_l1_intersect(AES &aes, array<point, tr> &rcvr_points,
+                                  array<point, ts> &sndr_points,
+                                  vector<point> &intersec) {
   constexpr const size_t twotod = ((size_t)pow(2, d));
   constexpr const size_t recvr_cell_count = ((size_t)pow(2, d)) * tr;
 
   unordered_map<block, size_t> rcvr_pts_hashes;
 
-  vector<block> rcvr_stcell_hashes(recvr_cell_count);
-  vector<block> sndr_st_hashes(ts);
+  std::vector<block> rcvr_stcell_hashes;
+  std::vector<block> sndr_st_hashes;
 
   sparse_comp::spatial_cell_hash<tr, d, recvr_cell_count>(
       aes, rcvr_points, rcvr_stcell_hashes, delta);
@@ -243,7 +257,7 @@ static void expected_linf_intersect(AES &aes, array<point, tr> &rcvr_points,
     if (rcvr_pts_hashes.contains(hash)) {
       size_t r_idx = rcvr_pts_hashes[hash];
 
-      if (is_linf_close<d>(rcvr_points[r_idx], sndr_points[i], delta)) {
+      if (is_l1_close<d>(rcvr_points[r_idx], sndr_points[i], delta)) {
         intersec.push_back(sndr_points[i]);
       }
     }
@@ -251,27 +265,29 @@ static void expected_linf_intersect(AES &aes, array<point, tr> &rcvr_points,
 }
 
 template <size_t tr, size_t ts, size_t d, uint8_t delta>
-static void safer_expected_linf_intersect(AES &aes,
-                                          array<point, tr> &rcvr_points,
-                                          array<point, ts> &sndr_points,
-                                          vector<point> &intersec) {
+static void safer_expected_l1_intersect(AES &aes, array<point, tr> &rcvr_points,
+                                        array<point, ts> &sndr_points,
+                                        vector<point> &intersec) {
   int64_t int64_delta = (int64_t)delta;
 
   for (size_t i = 0; i < ts; i++) {
     for (size_t j = 0; j < tr; j++) {
-      bool close = true;
+      int64_t total_dist = 0;
 
       for (size_t k = 0; k < d; k++) {
-        int64_t dist =
-            std::abs((int64_t)sndr_points[i][k] - (int64_t)rcvr_points[j][k]);
+        int64_t sndr_point = ((int64_t)sndr_points[i][k]);
+        int64_t rcvr_point = ((int64_t)rcvr_points[j][k]);
 
+        int64_t dist = std::abs(sndr_point - rcvr_point);
         if (dist > int64_delta) {
-          close = false;
+          total_dist = int64_delta + 1;
           break;
         }
+
+        total_dist += dist;
       }
 
-      if (close) {
+      if (total_dist <= int64_delta) {
         intersec.push_back(sndr_points[i]);
         break;
       }
@@ -303,17 +319,18 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
   return true;
 }
 
-#define GENERATE_FUZZYLINF_TEST(n, m, d, delta)                                \
-  TEST_CASE("fuzzylinf(t_s=" #n ",t_r=" #m ",d=" #d ",delta=" #delta ")",      \
-            "[fuzzylinf][n" #n ",m" #m ",d" #d ",delta" #delta "]") {          \
-    BENCHMARK_ADVANCED("[fuzzylinf][n" #n ",m" #m ",d" #d ",delta" #delta      \
-                       "]")(Catch::Benchmark::Chronometer meter) {             \
+#define GENERATE_FUZZYL1_TEST(n, m, d, delta)                                  \
+  TEST_CASE("fuzzyl1 (n=m=" #n " d=" #d " delta=" #delta ")",                  \
+            "[fuzzyl1][n=m=" #n "]") {                                         \
+    BENCHMARK_ADVANCED("n=m=" #n " d=" #d " delta=" #delta)(                   \
+        Catch::Benchmark::Chronometer meter) {                                 \
       constexpr size_t TS = n;                                                 \
       constexpr size_t TR = m;                                                 \
       constexpr size_t D = d;                                                  \
       constexpr size_t DELTA = delta;                                          \
       constexpr size_t ssp = 40;                                               \
       size_t target_matching_points = 29;                                      \
+                                                                               \
       auto socks = LocalAsyncSocket::makePair();                               \
       block seed = block(9536629026107651350ULL, 2724119864341290560ULL);      \
       PRNG senderPRNG =                                                        \
@@ -321,30 +338,40 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
       PRNG receiverPRNG =                                                      \
           PRNG(block(6427781726132732903ULL, 8471345356057289138ULL));         \
       AES aes = AES(block(14034463513942181890ULL, 16276202269246990858ULL));  \
+                                                                               \
       std::array<point, TS> *senderPoints = new std::array<point, TS>();       \
       std::array<point, TR> *receiverPoints = new std::array<point, TR>();     \
       std::vector<point> intersec;                                             \
+                                                                               \
       gen_constrained_rand_inputs<TR, TS, D, DELTA>(                           \
           seed, target_matching_points, *receiverPoints, *senderPoints);       \
-      sparse_comp::fuzzy_linf::Sender<TR, TS, D, DELTA, ssp> fuzzyLinfSender(  \
+                                                                               \
+      sparse_comp::fuzzy_l1::Sender<TR, TS, D, DELTA, ssp> fuzzyL1Sender(      \
           senderPRNG, aes);                                                    \
-      sparse_comp::fuzzy_linf::Receiver<TS, TR, D, DELTA, ssp> fuzzyLinfRecvr( \
+      sparse_comp::fuzzy_l1::Receiver<TS, TR, D, DELTA, ssp> fuzzyL1Recvr(     \
           receiverPRNG, aes);                                                  \
-      auto sender_proto = fuzzyLinfSender.send(socks[0], *senderPoints);       \
+                                                                               \
+      auto sender_proto = fuzzyL1Sender.send(socks[0], *senderPoints);         \
       auto receiver_proto =                                                    \
-          fuzzyLinfRecvr.receive(socks[1], *receiverPoints, intersec);         \
+          fuzzyL1Recvr.receive(socks[1], *receiverPoints, intersec);           \
+                                                                               \
       meter.measure([&sender_proto, &receiver_proto]() {                       \
         sync_wait(when_all_ready(std::move(sender_proto),                      \
                                  std::move(receiver_proto)));                  \
       });                                                                      \
+                                                                               \
       std::vector<point> expected_intersec;                                    \
-      expected_linf_intersect<TR, TS, D, DELTA>(                               \
+                                                                               \
+      expected_l1_intersect<TR, TS, D, DELTA>(                                 \
           aes, *receiverPoints, *senderPoints, expected_intersec);             \
+                                                                               \
       delete senderPoints;                                                     \
       delete receiverPoints;                                                   \
+                                                                               \
       const double nMBsExchanged =                                             \
           ((double)(socks[0].bytesSent() + socks[0].bytesReceived())) /        \
           1024.0 / 1024.0;                                                     \
+                                                                               \
       static bool communication_printed = false;                               \
       if (!communication_printed) {                                            \
         SUCCEED("Number of MBs exchanged: " << nMBsExchanged << " MB");        \
@@ -353,35 +380,20 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
     };                                                                         \
   }
 
-GENERATE_FUZZYLINF_TEST(256, 256, 2, 10)
-GENERATE_FUZZYLINF_TEST(256, 256, 2, 30)
-GENERATE_FUZZYLINF_TEST(256, 256, 2, 60)
-GENERATE_FUZZYLINF_TEST(256, 256, 2, 120)
-GENERATE_FUZZYLINF_TEST(256, 256, 2, 250)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 2, 10)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 2, 30)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 2, 60)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 2, 120)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 2, 250)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 10)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 30)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 60)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 120)
+GENERATE_FUZZYL1_TEST(65536, 65536, 2, 250)
 
-GENERATE_FUZZYLINF_TEST(256, 256, 6, 10)
-GENERATE_FUZZYLINF_TEST(256, 256, 6, 30)
-GENERATE_FUZZYLINF_TEST(256, 256, 6, 60)
-GENERATE_FUZZYLINF_TEST(256, 256, 6, 120)
-GENERATE_FUZZYLINF_TEST(256, 256, 6, 250)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 6, 10)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 6, 30)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 6, 60)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 6, 120)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 6, 250)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 10)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 30)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 60)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 120)
+GENERATE_FUZZYL1_TEST(65536, 65536, 6, 250)
 
-GENERATE_FUZZYLINF_TEST(256, 256, 10, 10)
-GENERATE_FUZZYLINF_TEST(256, 256, 10, 30)
-GENERATE_FUZZYLINF_TEST(256, 256, 10, 60)
-GENERATE_FUZZYLINF_TEST(256, 256, 10, 120)
-GENERATE_FUZZYLINF_TEST(256, 256, 10, 250)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 10, 10)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 10, 30)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 10, 60)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 10, 120)
-GENERATE_FUZZYLINF_TEST(4096, 4096, 10, 250)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 10)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 30)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 60)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 120)
+GENERATE_FUZZYL1_TEST(65536, 65536, 10, 250)

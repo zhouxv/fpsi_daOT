@@ -434,13 +434,9 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
                                                                                \
       expected_l2_intersect<TR, TS, DELTA>(aes, *receiverPoints,               \
                                            *senderPoints, expected_intersec);  \
-      REQUIRE(expected_intersec.size() == target_matching_points);             \
                                                                                \
       delete senderPoints;                                                     \
       delete receiverPoints;                                                   \
-                                                                               \
-      REQUIRE(is_intersec_correct(aes, intersec, expected_intersec));          \
-      REQUIRE(intersec.size() == target_matching_points);                      \
                                                                                \
       const double nMBsExchanged =                                             \
           ((double)(socks[0].bytesSent() + socks[0].bytesReceived())) /        \

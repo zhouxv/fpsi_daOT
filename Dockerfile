@@ -39,5 +39,7 @@ COPY CMakeLists.txt /home/CMakeLists.txt
 RUN chmod +x ./*.sh &&\
     ./build-bench.sh && \
     cp ./build/fuzzylinf_bench ./ &&\
+    cp ./build/fuzzylinf_16_bench ./ &&\
     cp ./build/fuzzyl1_bench ./ &&\
+    cp ./build/fuzzyl1_16_bench ./ &&\
     cp ./build/fuzzyl2_bench ./
