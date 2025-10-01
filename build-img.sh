@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo docker build -t ccs25:latest .
+sudo docker build -t ccs25_balance:latest .
 
-# docker tag ccs25:latest blueobsidian/ccs25:latest
-# docker push blueobsidian/ccs25:latest
+# docker tag ccs25_balance:latest blueobsidian/ccs25_balance:latest
+# docker push blueobsidian/ccs25_balance:latest

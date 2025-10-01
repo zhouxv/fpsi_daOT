@@ -42,6 +42,10 @@ install_volepsi_dependency() {
 
     git reset --hard 00ebece9881913cf281b5eaf74c2a76ec028d37a
 
+    mkdir -p ./out && cd ./out
+    wget https://sourceforge.net/projects/boost/files/boost/1.86.0/boost_1_86_0.tar.bz2
+    cd ..
+
     mkdir "../${VOLEPSI_INSTALL_PATH}"
 
     printf "\n###### Building volepsi #######\n\n"
