@@ -13,15 +13,15 @@ cleanup() {
 # Register Signal Capture
 trap 'cleanup' INT TERM EXIT
 
-./fuzzylinf_bench --benchmark-samples 10 -s > ccs25_balance_linf.log
+./fuzzylinf_bench --benchmark-samples 5 -s > ccs25_balance_linf.log
 
-./fuzzyl1_bench --benchmark-samples 10 -s > ccs25_balance_l1.log
+./fuzzyl1_bench --benchmark-samples 5 -s > ccs25_balance_l1.log
 
-./fuzzyl2_bench --benchmark-samples 10 -s > ccs25_balance_l2.log
+./fuzzyl2_bench --benchmark-samples 5 -s > ccs25_balance_l2.log
 
-./fuzzylinf_16_bench --benchmark-samples 5 -s > ccs25_balance_linf_16.log
+./fuzzylinf_16_bench --benchmark-samples 2 -s > ccs25_balance_linf_16.log
 
-./fuzzyl1_16_bench --benchmark-samples 5 -s > ccs25_balance_l1_16.log
+./fuzzyl1_16_bench --benchmark-samples 2 -s > ccs25_balance_l1_16.log
 
 
 
