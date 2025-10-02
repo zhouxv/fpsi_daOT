@@ -22,5 +22,5 @@ tcset lo --rate 10Mbps --delay 80ms --overwrite
 
 ```
 ./fuzzylinf_bench --benchmark-samples 1 -s
-nohup ./fuzzylinf_bench --benchmark-samples 1 -s > ccs25-100Mb.log 2>&1 &
+nohup ./run_bench.sh > log 2>&1 &
 ```
