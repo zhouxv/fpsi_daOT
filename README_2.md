@@ -7,12 +7,13 @@ cmake --build ./build -j
 ```
 
 ```bash
-sudo docker build -t ccs25_balance:latest .
+sudo docker build -t fpsi_daot:latest .
 
-# docker tag ccs25_balance:latest blueobsidian/ccs25_balance:latest
-# docker push blueobsidian/ccs25_balance:latest
+# docker tag fpsi_daot:latest blueobsidian/fpsi_daot:latest
+# docker push blueobsidian/fpsi_daot:latest
 
-sudo docker run -dit --name ccs25_balance --cap-add=NET_ADMIN ccs25_balance:latest
+sudo docker run -dit --name fpsi_daot --cap-add=NET_ADMIN fpsi_daot:latest
+sudo docker run -dit --name fpsi_daot --cap-add=NET_ADMIN blueobsidian/fpsi_daot:latest
 ```
 
 ```
