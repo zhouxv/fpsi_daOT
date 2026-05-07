@@ -31,14 +31,14 @@ RUN chmod +x /home/install-dependencies-in-container.sh && \
 
 COPY ./sparseComp /home/sparseComp
 COPY ./tests /home/tests
-COPY ./build_bench.sh /home/build_bench.sh
+COPY ./shell_build_cmd.sh /home/shell_build_cmd.sh
 COPY CMakeLists.txt /home/CMakeLists.txt
 
-RUN chmod +x ./build_bench.sh &&\
-    ./build_bench.sh && \
+RUN chmod +x ./shell_build_cmd.sh &&\
+    ./shell_build_cmd.sh && \
     cp ./build/fuzzylinf_bench ./ &&\
     cp ./build/fuzzyl1_bench ./ &&\
     cp ./build/fuzzyl2_bench ./
 
-COPY ./run_bench.sh /home/run_bench.sh
-RUN chmod +x ./run_bench.sh
+COPY ./shell_run_bench.sh /home/shell_run_bench.sh
+RUN chmod +x ./shell_run_bench.sh
