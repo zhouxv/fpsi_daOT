@@ -304,10 +304,10 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
 }
 
 #define GENERATE_FUZZYLINF_TEST(n, m, d, delta)                                \
-  TEST_CASE("fuzzylinf(t_s=" #n ",t_r=" #m ",d=" #d ",delta=" #delta ")",      \
+  TEST_CASE("fuzzylinf(n=" #n " m=" #m " d=" #d " delta=" #delta ")",          \
             "[fuzzylinf][n" #n ",m" #m ",d" #d ",delta" #delta "]") {          \
-    BENCHMARK_ADVANCED("[fuzzylinf][n" #n ",m" #m ",d" #d ",delta" #delta      \
-                       "]")(Catch::Benchmark::Chronometer meter) {             \
+    BENCHMARK_ADVANCED("[fuzzylinf][n" #n ",m" #m ",d" #d ",delta" #delta "]") \
+    (Catch::Benchmark::Chronometer meter) {                                    \
       constexpr size_t TS = n;                                                 \
       constexpr size_t TR = m;                                                 \
       constexpr size_t D = d;                                                  \

@@ -2,29 +2,71 @@
 
 This project implements the Fuzzy PSI protocols presented in [Distance-Aware OT with Application to Fuzzy PSI](https://eprint.iacr.org/2025/996).
 
-Our source code can be found inside ```sparseComp``` folder, while our benchmarks and tests can be found inside the ```tests``` folder. Additionaly, we also provide the build scripts ```build-bench.sh```,```build-tests.sh``` which can used to build our benchmarks and tests, respectively. Both of these scripts don't take any parameters. We also provide a script ```install-dependencies.sh``` that installs all the dependencies required by our project. Finally, we also provide a Dockerfile that contains all the required project dependencies and our source code. We suggest anybody simply desiring to run our benchmarks to run them using the provided docker image. More details about how to build the docker image, and about running the benchmark using this image can be found below.
+### Running Benchmark Collections
 
-### Running Benchmarks Using Docker
+We provide a convenience script `shell_run_bench.sh` to automatically run both L∞ and L1 Fuzzy PSI benchmarks and save their outputs.
 
-Please remember to install Docker before following the next instructions.
+## 1. Benchmark Executables
 
-To run our benchmarks using Docker we must first build our image using the Dockerfile provided in this repository. To further simplify this process we also provide the build-img.sh bash script that automatically builds the Docker image. To execute the script simply run ``bash build-img.sh`` while in the same directory as the script ```build-img.sh```. After having built the image, we can execute the image using the ```run-it.sh``` script, which can be executed by running the command ```bash run-it.sh```. We should now find our selves at directory ```/home``` of our container. 
+Our executables are placed inside the `/home/build` directory. The following benchmark executables are available:
 
-In the ```/home``` directory of our container you should find all of our source code along with build scripts. To build our benchmarks we must simply run the command ```bash build-bench.sh``` while at the ```/home```. This command will build all our benchmark executables, placing them inside ```/home/build```. Here is a list of the Fuzzy PSI protocols and their respective benchmark executable names:
+| Protocol | Executable Name |
+|----------|-----------------|
+| L∞ Fuzzy PSI | `fuzzylinf_bench` |
+| L1 Fuzzy PSI | `fuzzyl1_bench` |
+| L2 Fuzzy PSI | `fuzzyl2_bench` |
 
-- L Infinity Fuzzy PSI: ```fuzzylinf_bench```
-- L1 Fuzzy PSI: ```fuzzyl1_bench```
-- L2 Fuzzy PSI: ```fuzzyl2_bench```
+## 2. Catch2 Benchmark Usage
 
-All the benchmarks were implemented using the widely known and well documented [Catch2](https://github.com/catchorg/Catch2) C++ library. Each of these executables implement multiple benchmark, each one with different parameters. To list all the benchmarks implemented by an executable, simply run the executable with the parameter ```--list-tests```. For example:
+All benchmarks are implemented using the [Catch2](https://github.com/catchorg/Catch2) C++ library. Below are common ways to run and control the benchmarks.
 
-```./fuzzylinf_bench --list-tests```
+### List All Available Tests
 
-This will output a list of benchmark names. One example of a benchmark name is ```fuzzyl1 (n=m=256 d=2 delta=10 ssp=40)```. We can run this specific benchmark running the following command:
+```bash
+./fuzzylinf_bench --list-tests
+```
 
-```./fuzzyl1_bench --benchmark-samples 1 "fuzzyl1 (n=m=256 d=2 delta=10 ssp=40)"```
+### Specify Number of Samples
 
-The extra parameter ```--benchmark-samples``` tells Catch2 how many times to run the benchmark before calculating the final benchmark statistics. In this case we will be running the benchmark just a single time. Here is a Catch2 benchmark output example:
+```bash
+# Run each benchmark 3 times
+./fuzzylinf_bench --benchmark-samples 3
+```
 
-![Example Catch2 Benchmark Output](https://raw.githubusercontent.com/lpiske/sparse-comp/refs/heads/main/catch2-bench-out.png)
+### Run a Specific Test Case
 
+```bash
+# Use the test name as an argument to run a specific benchmark
+# L∞ 
+./fuzzylinf_bench --benchmark-samples 1 "fuzzylinf(n=256 m=256 d=6 delta=10)"
+
+# L1 
+./fuzzyl1_bench --benchmark-samples 1 "fuzzyl1(n=4096 m=4096 d=6 delta=10)"
+```
+
+### Show Success Details (-s or --success)
+
+By default, Catch2 only displays details for failing tests. Use -s (short for --success) to also show detailed output for successful tests, including benchmark results and SUCCEED() messages:
+
+```bash
+# Show detailed output for all tests (including successful ones)
+./fuzzylinf_bench -s --benchmark-samples 1 "fuzzylinf(n=256 m=256 d=6 delta=10)"
+
+# Equivalent to above
+./fuzzylinf_bench --success --benchmark-samples 1 "fuzzylinf(n=256 m=256 d=6 delta=10)"
+```
+
+## 3. Benchmark Collection Script
+
+We provide a convenience script `shell_run_bench.sh` to automatically run both L∞ and L1 Fuzzy PSI benchmarks and save their outputs.
+
+```bash
+# usage
+./shell_run_bench.sh
+```
+
+The script does the following:
+
+1. Runs the L∞ Fuzzy PSI benchmark with 3 samples and detailed output, saving results to `ccs25_balance_linf.log`
+
+2. Runs the L1 Fuzzy PSI benchmark with 3 samples and detailed output, saving results to `ccs25_balance_l1.log`

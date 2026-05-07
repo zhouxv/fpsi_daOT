@@ -320,10 +320,10 @@ bool is_intersec_correct(AES &aes, std::vector<point> &intersec,
 }
 
 #define GENERATE_FUZZYL1_TEST(n, m, d, delta)                                  \
-  TEST_CASE("fuzzyl1 (n=m=" #n " d=" #d " delta=" #delta ")",                  \
-            "[fuzzyl1][n=m=" #n "]") {                                         \
-    BENCHMARK_ADVANCED("n=m=" #n " d=" #d " delta=" #delta)(                   \
-        Catch::Benchmark::Chronometer meter) {                                 \
+  TEST_CASE("fuzzyl1(n=" #n " m=" #m " d=" #d " delta=" #delta ")",            \
+            "[fuzzyl1][n" #n ",m" #m ",d" #d ",delta" #delta "]") {            \
+    BENCHMARK_ADVANCED("[fuzzyl1][n" #n ",m" #m ",d" #d ",delta" #delta "]")   \
+    (Catch::Benchmark::Chronometer meter) {                                    \
       constexpr size_t TS = n;                                                 \
       constexpr size_t TR = m;                                                 \
       constexpr size_t D = d;                                                  \
