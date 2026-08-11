@@ -19,7 +19,7 @@ install_catch2_dependency() {
 
     cd ..
 
-    rm -rf catch2-install-tmp
+    # rm -rf catch2-install-tmp
 }
 
 install_volepsi_dependency() {
@@ -27,7 +27,7 @@ install_volepsi_dependency() {
 
     printf "####### Updating and upgrading system #######\n\n"
     sudo apt update
-    sudo apt upgrade -y
+    # sudo apt upgrade -y
 
     printf "\nInstalling system dependencies: nano, python3, software-properties-common, cmake, git, build-essential, libssl-dev, gdb, libtool\n\n"
     sudo apt install -y nano python3 software-properties-common cmake git build-essential libssl-dev gdb libtool
@@ -56,7 +56,7 @@ install_volepsi_dependency() {
 
     cd ..
 
-    rm -rf volepsi-tmp
+    # rm -rf volepsi-tmp
 }
 
 install_catch2_dependency "./catch2"

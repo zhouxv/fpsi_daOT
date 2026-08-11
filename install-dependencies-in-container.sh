@@ -55,7 +55,7 @@ install_volepsi_dependency() {
 
     cd ..
 
-    # rm -rf volepsi-tmp
+    rm -rf volepsi-tmp
 }
 
 install_catch2_dependency "/home/catch2"
