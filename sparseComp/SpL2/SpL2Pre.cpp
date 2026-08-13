@@ -90,7 +90,7 @@ Proto sparse_comp::sp_l2_pre::Sender<tr, t, delta, ssp>::online(
 
   MC_END();
 
-  for (u64 i = 0; i < oprf_instances; i++) {
+  for (uint64_t i = 0; i < oprf_instances; i++) {
     oprfSenders[i] = nullptr;
     oprfReceivers[i] = nullptr;
   }
@@ -160,7 +160,7 @@ Proto sparse_comp::sp_l2_pre::Receiver<ts, t, delta, ssp>::online(
 
   MC_END();
 
-  for (u64 i = 0; i < oprf_instances; i++) {
+  for (uint64_t i = 0; i < oprf_instances; i++) {
     oprfSenders[i] = nullptr;
     oprfReceivers[i] = nullptr;
   }

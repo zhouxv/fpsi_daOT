@@ -41,5 +41,6 @@ RUN chmod +x ./shell_build_cmd.sh &&\
     cp ./build/fuzzyl2_bench ./
 
 COPY ./shell_run_bench.sh /home/shell_run_bench.sh
+COPY ./shell_run_main.sh /home/shell_run_main.sh
 COPY ./README.md /home/README.md
-RUN chmod +x ./shell_run_bench.sh
+RUN chmod +x ./*.sh

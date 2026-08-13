@@ -16,6 +16,9 @@ set(CMAKE_PREFIX_PATH "${VOLEPSI_INSTALL_PATH};${CATCH2_INSTALL_PATH}")
 
 find_package(Catch2 3 REQUIRED)
 find_package(volePSI REQUIRED)
+find_package(fmt REQUIRED)
+
+
 
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -66,6 +69,9 @@ set(HEADERS
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyLInf/FuzzyLInfPre.h
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL1/FuzzyL1Pre.h
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL2/FuzzyL2Pre.h
+  ${CMAKE_SOURCE_DIR}/frontend/LInf.h
+  ${CMAKE_SOURCE_DIR}/frontend/L1Pre.h
+  ${CMAKE_SOURCE_DIR}/frontend/L2Pre.h
 )
 
 if(BUILD_BENCH)
@@ -92,8 +98,14 @@ if(BUILD_BENCH)
 endif()
 
 if(BUILD_MAIN)
-  add_executable(main ${CMAKE_SOURCE_DIR}/frontend/main.cpp ${SOURCES})
-  target_link_libraries(main PRIVATE visa::volePSI)
+
+  add_executable(main
+    ${CMAKE_SOURCE_DIR}/frontend/main.cpp
+    ${SOURCES}
+  )
+
+  target_link_libraries(main PRIVATE visa::volePSI fmt::fmt)
   target_compile_options(main PRIVATE ${DEFAULT_COMPILER_OPTIONS_AND_WARNINGS})
+
 endif()
 
