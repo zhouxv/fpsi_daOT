@@ -1,4 +1,4 @@
-#include "../sparseComp/FuzzyLinf/FuzzyLinf.h"
+#include "../sparseComp/FuzzyLInf/FuzzyLInf.h"
 #include "../sparseComp/Common/Common.h"
 #include "../sparseComp/Common/HashUtils.h"
 #include "catch2/benchmark/catch_benchmark.hpp"

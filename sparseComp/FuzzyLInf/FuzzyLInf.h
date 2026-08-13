@@ -48,4 +48,4 @@ public:
 
 } // namespace sparse_comp::fuzzy_linf
 
-#include "./FuzzyLinf.cpp"
+#include "./FuzzyLInf.cpp"

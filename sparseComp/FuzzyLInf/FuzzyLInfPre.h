@@ -77,4 +77,4 @@ public:
 
 } // namespace sparse_comp::fuzzy_linf_pre
 
-#include "./FuzzyLinfPre.cpp"
+#include "./FuzzyLInfPre.cpp"

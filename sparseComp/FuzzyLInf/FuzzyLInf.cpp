@@ -1,4 +1,4 @@
-#include "./FuzzyLinf.h"
+#include "./FuzzyLInf.h"
 #include "../Common/Common.h"
 #include "../Common/HashUtils.h"
 #include "../SpLInf/SpLInf.h"

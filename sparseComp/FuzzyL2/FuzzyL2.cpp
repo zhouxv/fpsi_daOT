@@ -1,7 +1,7 @@
 #include "./FuzzyL2.h"
 #include "../Common/Common.h"
 #include "../Common/HashUtils.h"
-#include "../FuzzyLinf/FuzzyLinf.h"
+#include "../FuzzyLInf/FuzzyLInf.h"
 #include "../SpL2/SpL2.h"
 #include <array>
 #include <cstdint>

@@ -57,11 +57,15 @@ set(HEADERS
   ${CMAKE_SOURCE_DIR}/sparseComp/SpL1/SpL1.h
   ${CMAKE_SOURCE_DIR}/sparseComp/SpL2/SpL2.h
   ${CMAKE_SOURCE_DIR}/sparseComp/SpLInf/SpLInfPre.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/SpL1/SpL1Pre.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/SpL2/SpL2Pre.h
   ${CMAKE_SOURCE_DIR}/sparseComp/Common/SockUtils.h
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyLInf/FuzzyLInf.h
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL1/FuzzyL1.h
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL2/FuzzyL2.h
   ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyLInf/FuzzyLInfPre.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL1/FuzzyL1Pre.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL2/FuzzyL2Pre.h
 )
 
 if(BUILD_BENCH)
@@ -69,29 +73,17 @@ if(BUILD_BENCH)
     fuzzylinf_bench
     fuzzyl1_bench
     fuzzyl2_bench
-    fuzzylinf_pre_bench
-    # fuzzyl1_pre_bench
-    # fuzzyl2_pre_bench
   )
 
   set(TEST_SOURCE_PREFIX ${CMAKE_SOURCE_DIR}/tests)
 
-  add_executable(fuzzylinf_bench ${TEST_SOURCE_PREFIX}/FuzzyLinf.bench.cpp ${SOURCES})
-
+  add_executable(fuzzylinf_bench ${TEST_SOURCE_PREFIX}/FuzzyLInf.bench.cpp ${SOURCES})
   add_executable(fuzzyl1_bench ${TEST_SOURCE_PREFIX}/FuzzyL1.bench.cpp ${SOURCES})
-
   add_executable(fuzzyl2_bench ${TEST_SOURCE_PREFIX}/FuzzyL2.bench.cpp ${SOURCES})
-
-  add_executable(fuzzylinf_pre_bench ${TEST_SOURCE_PREFIX}/FuzzyLinfPre.bench.cpp ${SOURCES})
-
-  # add_executable(fuzzyl1_pre_bench ${TEST_SOURCE_PREFIX}/FuzzyL1Pre.bench.cpp ${SOURCES})
-
-  # add_executable(fuzzyl2_pre_bench ${TEST_SOURCE_PREFIX}/FuzzyL2Pre.bench.cpp ${SOURCES})
 
 
   foreach(target ${ALL_BENCHS})
     set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
-    target_compile_features(${target} PUBLIC cxx_std_20)
     target_compile_options(${target} PRIVATE ${DEFAULT_COMPILER_OPTIONS_AND_WARNINGS})
     target_link_libraries(${target} PRIVATE Catch2::Catch2WithMain visa::volePSI)
 
@@ -99,7 +91,9 @@ if(BUILD_BENCH)
   endforeach()
 endif()
 
-#add_executable(MyExe ${CMAKE_SOURCE_DIR}/sparseComp/main.cpp ${SOURCES})
+if(BUILD_MAIN)
+  add_executable(main ${CMAKE_SOURCE_DIR}/frontend/main.cpp ${SOURCES})
+  target_link_libraries(${target} PRIVATE visa::volePSI)
+  target_compile_options(${target} PRIVATE ${DEFAULT_COMPILER_OPTIONS_AND_WARNINGS})
+endif()
 
-#add_executable(oprf_main ${CMAKE_SOURCE_DIR}/sparseComp/oprf_main.cpp ${SOURCES})
-#target_link_libraries(oprf_main visa::volePSI)
