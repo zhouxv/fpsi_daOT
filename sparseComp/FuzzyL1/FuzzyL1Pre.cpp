@@ -31,6 +31,7 @@ Proto sparse_comp::fuzzy_l1_pre::Sender<tr, t, d, delta, ssp>::offline(
 
   MC_END();
 }
+
 template <size_t ts, size_t t, size_t d, uint8_t delta, uint8_t ssp>
 Proto sparse_comp::fuzzy_l1_pre::Receiver<ts, t, d, delta, ssp>::offline(
     Socket &sock, array<point, t> &points) {

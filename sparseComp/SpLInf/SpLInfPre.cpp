@@ -92,6 +92,13 @@ Proto sparse_comp::sp_linf_pre::Sender<tr, t, d, delta, ssp>::online(
   delete g_shares;
 
   MC_END();
+
+  for (u64 i = 0; i < oprf_instances; i++) {
+    oprfSenders[i] = nullptr;
+    oprfReceivers[i] = nullptr;
+  }
+  oprfSenders.clear();
+  oprfReceivers.clear();
 }
 
 template <size_t ts, size_t t, size_t d, uint8_t delta, uint8_t ssp>
@@ -150,4 +157,11 @@ Proto sparse_comp::sp_linf_pre::Receiver<ts, t, d, delta, ssp>::online(
   delete g_shares;
 
   MC_END();
+
+  for (u64 i = 0; i < oprf_instances; i++) {
+    oprfSenders[i] = nullptr;
+    oprfReceivers[i] = nullptr;
+  }
+  oprfSenders.clear();
+  oprfReceivers.clear();
 }

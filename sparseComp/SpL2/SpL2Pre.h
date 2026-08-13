@@ -27,6 +27,15 @@ public:
     this->aes = &aes;
   }
 
+  ~Sender() {
+    for (auto oprfSender : oprfSenders) {
+      delete oprfSender;
+    }
+    for (auto oprfReceiver : oprfReceivers) {
+      delete oprfReceiver;
+    }
+  }
+
   coproto::task<void> offline(coproto::Socket &sock);
 
   coproto::task<void>
@@ -49,6 +58,15 @@ public:
         oprfSenders(oprf_instances, nullptr) {
     this->prng = &prng;
     this->aes = &aes;
+  }
+
+  ~Receiver() {
+    for (auto oprfSender : oprfSenders) {
+      delete oprfSender;
+    }
+    for (auto oprfReceiver : oprfReceivers) {
+      delete oprfReceiver;
+    }
   }
 
   coproto::task<void> offline(coproto::Socket &sock);
