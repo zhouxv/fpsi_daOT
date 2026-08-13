@@ -101,6 +101,9 @@ if(BUILD_MAIN)
 
   add_executable(main
     ${CMAKE_SOURCE_DIR}/frontend/main.cpp
+    ${CMAKE_SOURCE_DIR}/frontend/LInfPre.cpp
+    ${CMAKE_SOURCE_DIR}/frontend/L1Pre.cpp
+    ${CMAKE_SOURCE_DIR}/frontend/L2Pre.cpp
     ${SOURCES}
   )
 

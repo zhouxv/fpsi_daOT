@@ -185,7 +185,7 @@ tmp_encode_okvs(const AES &aes, const vector<block> &pointHashes,
   return paxos_structure;
 }
 
-Proto sendOkvsStructure(Socket &sock, vector<block> &paxos_structure) {
+inline Proto sendOkvsStructure(Socket &sock, vector<block> &paxos_structure) {
   MC_BEGIN(Proto, &sock, &paxos_structure, t = coproto::task<void>());
 
   t = sparse_comp::send<block, sparse_comp::COPROTO_MAX_SEND_SIZE_BYTES>(
@@ -341,8 +341,8 @@ static void internalReceive(AES &aes, CustomOPRFSender &oprfSender,
   delete okvs_vals;
 }
 
-Proto receiveOkvsStructure(coproto::Socket &sock,
-                           vector<block> &paxos_structure) {
+inline Proto receiveOkvsStructure(coproto::Socket &sock,
+                                  vector<block> &paxos_structure) {
   MC_BEGIN(Proto, &sock, &paxos_structure, t = coproto::task<void>());
 
   t = sparse_comp::receive<block, sparse_comp::COPROTO_MAX_SEND_SIZE_BYTES>(
