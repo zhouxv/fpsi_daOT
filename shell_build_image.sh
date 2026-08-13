@@ -1,5 +1,5 @@
 #!/bin/bash
-sudo docker build -t fpsi_opprf_exp_21:latest .
+sudo docker build -t fpsi_daot:latest .
 
-# docker tag fpsi_opprf_exp_21:latest blueobsidian/fpsi_opprf_exp_21:latest
-# docker push blueobsidian/fpsi_opprf_exp_21:latest
+# docker tag fpsi_daot:latest blueobsidian/fpsi_daot:latest
+# docker push blueobsidian/fpsi_daot:latest

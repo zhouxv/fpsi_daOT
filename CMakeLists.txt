@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(MyProj)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set (CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20)
 
 if(NOT DEFINED VOLEPSI_INSTALL_PATH)
   set(VOLEPSI_INSTALL_PATH "${CMAKE_SOURCE_DIR}/volepsi")
@@ -12,7 +12,7 @@ if(NOT DEFINED CATCH2_INSTALL_PATH)
   set(CATCH2_INSTALL_PATH "${CMAKE_SOURCE_DIR}/catch2")
 endif()
 
-set (CMAKE_PREFIX_PATH "${VOLEPSI_INSTALL_PATH};${CATCH2_INSTALL_PATH}")
+set(CMAKE_PREFIX_PATH "${VOLEPSI_INSTALL_PATH};${CATCH2_INSTALL_PATH}")
 
 find_package(Catch2 3 REQUIRED)
 find_package(volePSI REQUIRED)
@@ -22,24 +22,24 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_options(-fsanitize=address)
   add_link_options(-fsanitize=address)
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
   add_compile_options(-O3)
 endif()
 
 message(CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 set(SOURCES
-   ${CMAKE_SOURCE_DIR}/sparseComp/Common/BaxosUtils.cpp
-   ${CMAKE_SOURCE_DIR}/sparseComp/Common/BlockUtils.cpp
-   ${CMAKE_SOURCE_DIR}/sparseComp/CustomOPRF/CustomizedOPRF.cpp
-   ${CMAKE_SOURCE_DIR}/sparseComp/MultiOPRF/MultiOPRF.cpp
-   ${CMAKE_SOURCE_DIR}/sparseComp/Common/HashUtils.cpp
-   ${CMAKE_SOURCE_DIR}/sparseComp/Common/Common.cpp
+  ${CMAKE_SOURCE_DIR}/sparseComp/Common/BaxosUtils.cpp
+  ${CMAKE_SOURCE_DIR}/sparseComp/Common/BlockUtils.cpp
+  ${CMAKE_SOURCE_DIR}/sparseComp/CustomOPRF/CustomizedOPRF.cpp
+  ${CMAKE_SOURCE_DIR}/sparseComp/MultiOPRF/MultiOPRF.cpp
+  ${CMAKE_SOURCE_DIR}/sparseComp/Common/HashUtils.cpp
+  ${CMAKE_SOURCE_DIR}/sparseComp/Common/Common.cpp
 )
 set(HEADERS
   ${CMAKE_SOURCE_DIR}/sparseComp/Common/Common.h
@@ -56,34 +56,47 @@ set(HEADERS
   ${CMAKE_SOURCE_DIR}/sparseComp/SpLInf/SpLInf.h
   ${CMAKE_SOURCE_DIR}/sparseComp/SpL1/SpL1.h
   ${CMAKE_SOURCE_DIR}/sparseComp/SpL2/SpL2.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/SpLInf/SpLInfPre.h
   ${CMAKE_SOURCE_DIR}/sparseComp/Common/SockUtils.h
-  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyLinf/FuzzyLinf.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyLInf/FuzzyLInf.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL1/FuzzyL1.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyL2/FuzzyL2.h
+  ${CMAKE_SOURCE_DIR}/sparseComp/FuzzyLInf/FuzzyLInfPre.h
 )
 
 if(BUILD_BENCH)
-   set(ALL_BENCHS
-        fuzzylinf_bench
-        fuzzyl1_bench
-        fuzzyl2_bench
-    )
+  set(ALL_BENCHS
+    fuzzylinf_bench
+    fuzzyl1_bench
+    fuzzyl2_bench
+    fuzzylinf_pre_bench
+    # fuzzyl1_pre_bench
+    # fuzzyl2_pre_bench
+  )
 
-    set (TEST_SOURCE_PREFIX ${CMAKE_SOURCE_DIR}/tests)
-    
-    add_executable(fuzzylinf_bench ${TEST_SOURCE_PREFIX}/FuzzyLinf.bench.cpp ${SOURCES})
+  set(TEST_SOURCE_PREFIX ${CMAKE_SOURCE_DIR}/tests)
 
-    add_executable(fuzzyl1_bench ${TEST_SOURCE_PREFIX}/FuzzyL1.bench.cpp ${SOURCES})
+  add_executable(fuzzylinf_bench ${TEST_SOURCE_PREFIX}/FuzzyLinf.bench.cpp ${SOURCES})
 
-    add_executable(fuzzyl2_bench ${TEST_SOURCE_PREFIX}/FuzzyL2.bench.cpp ${SOURCES})
+  add_executable(fuzzyl1_bench ${TEST_SOURCE_PREFIX}/FuzzyL1.bench.cpp ${SOURCES})
+
+  add_executable(fuzzyl2_bench ${TEST_SOURCE_PREFIX}/FuzzyL2.bench.cpp ${SOURCES})
+
+  add_executable(fuzzylinf_pre_bench ${TEST_SOURCE_PREFIX}/FuzzyLinfPre.bench.cpp ${SOURCES})
+
+  # add_executable(fuzzyl1_pre_bench ${TEST_SOURCE_PREFIX}/FuzzyL1Pre.bench.cpp ${SOURCES})
+
+  # add_executable(fuzzyl2_pre_bench ${TEST_SOURCE_PREFIX}/FuzzyL2Pre.bench.cpp ${SOURCES})
 
 
-    foreach(target ${ALL_BENCHS})
-        set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
-        target_compile_features(${target} PUBLIC cxx_std_20)
-        target_compile_options(${target} PRIVATE ${DEFAULT_COMPILER_OPTIONS_AND_WARNINGS})
-        target_link_libraries(${target} PRIVATE Catch2::Catch2WithMain visa::volePSI)
+  foreach(target ${ALL_BENCHS})
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+    target_compile_features(${target} PUBLIC cxx_std_20)
+    target_compile_options(${target} PRIVATE ${DEFAULT_COMPILER_OPTIONS_AND_WARNINGS})
+    target_link_libraries(${target} PRIVATE Catch2::Catch2WithMain visa::volePSI)
 
-        add_test(NAME ${target} COMMAND ${target})
-    endforeach()
+    add_test(NAME ${target} COMMAND ${target})
+  endforeach()
 endif()
 
 #add_executable(MyExe ${CMAKE_SOURCE_DIR}/sparseComp/main.cpp ${SOURCES})
