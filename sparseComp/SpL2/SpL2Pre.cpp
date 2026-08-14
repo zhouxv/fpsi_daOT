@@ -89,13 +89,6 @@ Proto sparse_comp::sp_l2_pre::Sender<tr, t, delta, ssp>::online(
   delete g_vec_shares;
 
   MC_END();
-
-  for (uint64_t i = 0; i < oprf_instances; i++) {
-    oprfSenders[i] = nullptr;
-    oprfReceivers[i] = nullptr;
-  }
-  oprfSenders.clear();
-  oprfReceivers.clear();
 }
 
 template <size_t ts, size_t t, uint8_t delta, uint8_t ssp>
@@ -159,11 +152,4 @@ Proto sparse_comp::sp_l2_pre::Receiver<ts, t, delta, ssp>::online(
   delete g_vec_shares;
 
   MC_END();
-
-  for (uint64_t i = 0; i < oprf_instances; i++) {
-    oprfSenders[i] = nullptr;
-    oprfReceivers[i] = nullptr;
-  }
-  oprfSenders.clear();
-  oprfReceivers.clear();
 }

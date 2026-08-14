@@ -30,17 +30,6 @@ public:
     this->aes = &aes;
   }
 
-  ~Sender() {
-    for (auto oprfSender : oprfSenders) {
-      if (oprfSender != nullptr)
-        delete oprfSender;
-    }
-    for (auto oprfReceiver : oprfReceivers) {
-      if (oprfReceiver != nullptr)
-        delete oprfReceiver;
-    }
-  }
-
   coproto::task<void>
   send(coproto::Socket &sock, std::vector<oc::block> &ordIndexHashSet,
        std::array<std::array<uint32_t, d>, t> &in_values,
@@ -69,17 +58,6 @@ public:
         oprfSenders(oprf_instances, nullptr) {
     this->prng = &prng;
     this->aes = &aes;
-  }
-
-  ~Receiver() {
-    for (auto oprfSender : oprfSenders) {
-      if (oprfSender != nullptr)
-        delete oprfSender;
-    }
-    for (auto oprfReceiver : oprfReceivers) {
-      if (oprfReceiver != nullptr)
-        delete oprfReceiver;
-    }
   }
 
   coproto::task<void>
