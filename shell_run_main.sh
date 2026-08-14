@@ -15,16 +15,64 @@
 BIN="./build/main"
 LOG_FILE="OOTEST_$(date +%Y-%m-%d_%H-%M-%S).log"
 
-# Number of repeated trials used by main to calculate average results.
+# Set default parameters for the benchmark.
 trait=20
-
-# Keep the same benchmark setting as tests.
 target_matching_points=29
-
 ns=(8 12 16)
 dims=(2 6 10)
 deltas=(10 60 250)
 
+# ============================================================
+# Parse command-line arguments.
+# ============================================================
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -trait)
+      trait="$2"
+      shift 2
+      ;;
+
+    -i)
+      target_matching_points="$2"
+      shift 2
+      ;;
+
+    -n)
+      shift
+      ns=()
+      while [[ $# -gt 0 && "$1" != -* ]]; do
+        ns+=("$1")
+        shift
+      done
+      ;;
+
+    -d)
+      shift
+      dims=()
+      while [[ $# -gt 0 && "$1" != -* ]]; do
+        dims+=("$1")
+        shift
+      done
+      ;;
+
+    -delta)
+      shift
+      deltas=()
+      while [[ $# -gt 0 && "$1" != -* ]]; do
+        deltas+=("$1")
+        shift
+      done
+      ;;
+
+    *)
+      echo "Unknown argument: $1"
+      exit 1
+      ;;
+  esac
+done
+
+# Print the header of the benchmark results.
 print_header() {
   printf "%-7s  %7s  %7s  %2s  %7s  %9s  %9s  %9s  %9s  %9s  %9s\n" \
     "" \
