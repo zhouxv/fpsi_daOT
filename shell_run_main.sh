@@ -16,7 +16,7 @@ BIN="./build/main"
 LOG_FILE="OOTEST_$(date +%Y-%m-%d_%H-%M-%S).log"
 
 # Number of repeated trials used by main to calculate average results.
-trait=5
+trait=20
 
 # Keep the same benchmark setting as tests.
 target_matching_points=29
@@ -25,8 +25,25 @@ ns=(8 12 16)
 dims=(2 6 10)
 deltas=(10 60 250)
 
+print_header() {
+  printf "%-7s  %7s  %7s  %2s  %7s  %9s  %9s  %9s  %9s  %9s  %9s\n" \
+    "" \
+    "N" \
+    "Metric" \
+    "d" \
+    "delta" \
+    "Off.Com(MB)" \
+    "Off.Time(s)" \
+    "On.Com(MB)" \
+    "On.Time(s)" \
+    "Total.Com" \
+    "Total.Time" \
+    | tee -a "${LOG_FILE}"
+}
+
 # Clear previous results.
 echo "==================== LInfPre ====================" | tee -a "${LOG_FILE}"
+print_header
 
 for dim in "${dims[@]}"; do
   for n in "${ns[@]}"; do
@@ -49,6 +66,7 @@ done
 
 
 echo "===================== L1Pre =====================" | tee -a "${LOG_FILE}"
+print_header
 
 for dim in "${dims[@]}"; do
   for n in "${ns[@]}"; do
@@ -71,6 +89,7 @@ done
 
 
 echo "===================== L2Pre =====================" | tee -a "${LOG_FILE}"
+print_header
 
 dim=2
 

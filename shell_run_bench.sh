@@ -17,7 +17,7 @@ trap 'cleanup' INT TERM EXIT
 
 ./fuzzyl1_bench --benchmark-samples 3 -s > ccs25_balance_l1.log
 
-
+./fuzzyl2_bench --benchmark-samples 3 -s > ccs25_balance_l2.log
 
 
 
