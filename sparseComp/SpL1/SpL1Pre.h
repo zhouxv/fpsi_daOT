@@ -30,10 +30,12 @@ public:
 
   ~Sender() {
     for (auto oprfSender : oprfSenders) {
-      delete oprfSender;
+      if (oprfSender != nullptr)
+        delete oprfSender;
     }
     for (auto oprfReceiver : oprfReceivers) {
-      delete oprfReceiver;
+      if (oprfReceiver != nullptr)
+        delete oprfReceiver;
     }
   }
 
@@ -63,10 +65,12 @@ public:
 
   ~Receiver() {
     for (auto oprfSender : oprfSenders) {
-      delete oprfSender;
+      if (oprfSender != nullptr)
+        delete oprfSender;
     }
     for (auto oprfReceiver : oprfReceivers) {
-      delete oprfReceiver;
+      if (oprfReceiver != nullptr)
+        delete oprfReceiver;
     }
   }
 

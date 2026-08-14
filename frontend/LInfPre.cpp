@@ -289,7 +289,7 @@ int run_fuzzylinf_pre(size_t target_matching_points, size_t trait,
   const uint64_t delta = DELTA;
 
   // Final benchmark row: all six values are averages over trait runs.
-  std::cout << std::format("[daot_fpsi]  {:^5}  𝐿{}  {:^5}  {:^5}  "
+  std::cout << fmt::format("[daot_fpsi]  {:^5}  𝐿{}  {:^5}  {:^5}  "
                            "{:^10.3f}  {:^10.3f}  {:^10.3f}  {:^10.3f}  "
                            "{:^10.3f}  {:^10.3f}",
                            set_size, mertric_str, dim, delta, avg_offline_com,

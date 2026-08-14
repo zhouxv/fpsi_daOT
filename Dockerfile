@@ -30,6 +30,7 @@ RUN chmod +x /home/install-dependencies-in-container.sh && \
     /home/install-dependencies-in-container.sh
 
 COPY ./sparseComp /home/sparseComp
+COPY ./frontend /home/frontend
 COPY ./tests /home/tests
 COPY ./shell_build_cmd.sh /home/shell_build_cmd.sh
 COPY CMakeLists.txt /home/CMakeLists.txt

@@ -297,7 +297,7 @@ int run_fuzzyl1_pre(size_t target_matching_points, size_t trait,
 
   // Final benchmark row: all six values are averages over trait runs.
   // 最终结果只输出一行；离线、在线、全部通信与时间均为 trait 次实验平均值。
-  std::cout << std::format("[daot_fpsi]  {:^5}  𝐿{}  {:^5}  {:^5}  "
+  std::cout << fmt::format("[daot_fpsi]  {:^5}  𝐿{}  {:^5}  {:^5}  "
                            "{:^10.3f}  {:^10.3f}  {:^10.3f}  {:^10.3f}  "
                            "{:^10.3f}  {:^10.3f}",
                            set_size, mertric_str, dim, delta, avg_offline_com,
