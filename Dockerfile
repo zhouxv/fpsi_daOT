@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-WORKDIR /home
+WORKDIR /workspace
 
 # Install dependencies
 RUN apt-get update && \
@@ -24,21 +24,21 @@ RUN apt-get update && \
 RUN apt-get update && \
     apt-get install -y wget
 
-COPY ./install-dependencies-in-container.sh /home/install-dependencies-in-container.sh
+COPY ./install-dependencies-in-container.sh /workspace/install-dependencies-in-container.sh
 
-RUN chmod +x /home/install-dependencies-in-container.sh && \
-    /home/install-dependencies-in-container.sh
+RUN chmod +x /workspace/install-dependencies-in-container.sh && \
+    /workspace/install-dependencies-in-container.sh
 
-COPY ./sparseComp /home/sparseComp
-COPY ./frontend /home/frontend
-COPY ./tests /home/tests
-COPY ./shell_build_cmd.sh /home/shell_build_cmd.sh
-COPY CMakeLists.txt /home/CMakeLists.txt
+COPY ./sparseComp /workspace/sparseComp
+COPY ./frontend /workspace/frontend
+COPY ./tests /workspace/tests
+COPY ./shell_build_cmd.sh /workspace/shell_build_cmd.sh
+COPY CMakeLists.txt /workspace/CMakeLists.txt
 
 RUN chmod +x ./shell_build_cmd.sh &&\
     ./shell_build_cmd.sh
 
-COPY ./shell_run_main.sh /home/shell_run_main.sh
-COPY ./shell_config_network.sh /home/shell_config_network.sh
-COPY ./README.md /home/README.md
+COPY ./shell_run_main.sh /workspace/shell_run_main.sh
+COPY ./shell_config_network.sh /workspace/shell_config_network.sh
+COPY ./README.md /workspace/README.md
 RUN chmod +x ./*.sh

@@ -58,5 +58,5 @@ install_volepsi_dependency() {
     rm -rf volepsi-tmp
 }
 
-install_catch2_dependency "/home/catch2"
-install_volepsi_dependency "/home/volepsi"
+install_catch2_dependency "/workspace/catch2"
+install_volepsi_dependency "/workspace/volepsi"
