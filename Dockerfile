@@ -36,12 +36,9 @@ COPY ./shell_build_cmd.sh /home/shell_build_cmd.sh
 COPY CMakeLists.txt /home/CMakeLists.txt
 
 RUN chmod +x ./shell_build_cmd.sh &&\
-    ./shell_build_cmd.sh && \
-    cp ./build/fuzzylinf_bench ./ &&\
-    cp ./build/fuzzyl1_bench ./ &&\
-    cp ./build/fuzzyl2_bench ./
+    ./shell_build_cmd.sh
 
-COPY ./shell_run_bench.sh /home/shell_run_bench.sh
 COPY ./shell_run_main.sh /home/shell_run_main.sh
+COPY ./shell_config_network.sh /home/shell_config_network.sh
 COPY ./README.md /home/README.md
 RUN chmod +x ./*.sh
