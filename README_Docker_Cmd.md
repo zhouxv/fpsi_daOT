@@ -11,11 +11,14 @@ cmake --build ./build -j
 ```bash
 sudo docker build -t fpsi_daot:latest .
 
-# docker tag fpsi_daot:latest blueobsidian/fpsi_daot:latest
-# docker push blueobsidian/fpsi_daot:latest
+docker tag fpsi_daot:latest blueobsidian/fpsi_daot:latest
+docker push blueobsidian/fpsi_daot:latest
+
+# docker tag fpsi_daot:latest blueobsidian/fpsi_cmp_artifact_exp12:latest
+# docker push blueobsidian/fpsi_cmp_artifact_exp12:latest
 
 sudo docker run -dit --name fpsi_daot --cap-add=NET_ADMIN fpsi_daot:latest
-sudo docker run -dit --name fpsi_daot --cap-add=NET_ADMIN blueobsidian/fpsi_daot:latest
+# sudo docker run -dit --name fpsi_daot --cap-add=NET_ADMIN blueobsidian/fpsi_cmp_artifact_exp12:latest
 ```
 
 ## Network Traffic Control

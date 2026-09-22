@@ -24,10 +24,11 @@ void printUsage() {
             << "  -n <size>        Set size (logarithm), default: 8\n"
             << "                   Input set size = 2^n\n"
             << "                   Supported values: 8, 12, 16\n"
-            << "  -d <dim>         L-infinity/L1: 6 or 10; L2: 2\n"
+            << "  -d <dim>         L-infinity/L1: 2, 6 or 10; L2: 2\n"
             << "  -delta <value>   Supported values: 10, 60, 250\n"
             << "  -i <size>        target_matching_points, default: 29\n"
-            << "  -trait <num>     Number of trials, default: 1\n\n"
+            << "  -trait <num>     Number of trials, default: 1\n"
+            << "  -out <file>      Append averaged results to CSV (optional)\n\n"
             << "Network Configuration:\n"
             << "  -ip <address>    Server IP address, default: 127.0.0.1\n"
             << "  -port <number>   Server port, default: 1212\n\n"
@@ -71,7 +72,7 @@ int main(int argc, char **argv) {
     osuCrypto::CLP cmd;
     cmd.parse(argc, argv);
 
-    if (cmd.isSet("h") || cmd.isSet("help")) {
+    if (cmd.isSet("h") || cmd.isSet("help") || cmd.isSet("-help")) {
       printUsage();
       return 0;
     }

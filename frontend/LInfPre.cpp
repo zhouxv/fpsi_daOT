@@ -13,6 +13,8 @@
 #include <chrono>
 #include <cstdint>
 #include <format>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -182,7 +184,8 @@ void gen_constrained_rand_inputs(block seed, size_t target_matching_points,
 
 template <size_t TS, size_t TR, size_t D, uint8_t DELTA>
 int run_fuzzylinf_pre(size_t target_matching_points, size_t trait,
-                      const std::string &ip, uint64_t port, bool detail) {
+                      const std::string &ip, uint64_t port, bool detail,
+                         osuCrypto::CLP &cmd) {
   if (trait == 0) {
     spdlog::error("-trait must be greater than 0");
     return 1;
@@ -297,24 +300,46 @@ int run_fuzzylinf_pre(size_t target_matching_points, size_t trait,
                            avg_total_com, avg_total_time)
             << std::endl;
 
+  if (cmd.isSet("out")) {
+    const auto outputPath = cmd.get<std::string>("out");
+    std::ifstream existing(outputPath, std::ios::binary | std::ios::ate);
+    const bool writeHeader = !existing || existing.tellg() == 0;
+    std::ofstream output(outputPath, std::ios::app);
+    if (!output) {
+      throw std::runtime_error("failed to open result file: " + outputPath);
+    }
+    if (writeHeader) {
+      output << "Protocol,Metric,Dim,Delta,Size,"
+                "Offline_Com.(MB),Offline(s),Online_Com.(MB),Online(s),Total_"
+                "Com.(MB),Total(s)\n";
+    }
+
+    const std::string csv_metric = "Linf";
+    output << "fpsi_daot," << csv_metric << ',' << dim << ',' << delta << ','
+           << set_size << ',' << std::fixed << std::setprecision(3)
+           << avg_offline_com << ',' << avg_offline_time << ',' << avg_online_com
+           << ',' << avg_online_time << ',' << avg_total_com << ','
+           << avg_total_time << '\n';
+  }
   return 0;
 }
 
 template <size_t N>
 int dispatch_fuzzylinf_pre(size_t d, uint64_t delta,
                            size_t target_matching_points, size_t trait,
-                           const std::string &ip, uint64_t port, bool detail) {
+                           const std::string &ip, uint64_t port, bool detail,
+                         osuCrypto::CLP &cmd) {
   if (d == 2) {
     switch (delta) {
     case 10:
       return run_fuzzylinf_pre<N, N, 2, 10>(target_matching_points, trait, ip,
-                                            port, detail);
+                                            port, detail, cmd);
     case 60:
       return run_fuzzylinf_pre<N, N, 2, 60>(target_matching_points, trait, ip,
-                                            port, detail);
+                                            port, detail, cmd);
     case 250:
       return run_fuzzylinf_pre<N, N, 2, 250>(target_matching_points, trait, ip,
-                                             port, detail);
+                                             port, detail, cmd);
     }
   }
 
@@ -322,13 +347,13 @@ int dispatch_fuzzylinf_pre(size_t d, uint64_t delta,
     switch (delta) {
     case 10:
       return run_fuzzylinf_pre<N, N, 6, 10>(target_matching_points, trait, ip,
-                                            port, detail);
+                                            port, detail, cmd);
     case 60:
       return run_fuzzylinf_pre<N, N, 6, 60>(target_matching_points, trait, ip,
-                                            port, detail);
+                                            port, detail, cmd);
     case 250:
       return run_fuzzylinf_pre<N, N, 6, 250>(target_matching_points, trait, ip,
-                                             port, detail);
+                                             port, detail, cmd);
     }
   }
 
@@ -336,13 +361,13 @@ int dispatch_fuzzylinf_pre(size_t d, uint64_t delta,
     switch (delta) {
     case 10:
       return run_fuzzylinf_pre<N, N, 10, 10>(target_matching_points, trait, ip,
-                                             port, detail);
+                                             port, detail, cmd);
     case 60:
       return run_fuzzylinf_pre<N, N, 10, 60>(target_matching_points, trait, ip,
-                                             port, detail);
+                                             port, detail, cmd);
     case 250:
       return run_fuzzylinf_pre<N, N, 10, 250>(target_matching_points, trait, ip,
-                                              port, detail);
+                                              port, detail, cmd);
     }
   }
 
@@ -376,13 +401,13 @@ int run_linf_pre(osuCrypto::CLP &cmd) {
   switch (n) {
   case 8:
     return dispatch_fuzzylinf_pre<256>(d, delta, target_matching_points, trait,
-                                       ip, port, detail);
+                                       ip, port, detail, cmd);
   case 12:
     return dispatch_fuzzylinf_pre<4096>(d, delta, target_matching_points, trait,
-                                        ip, port, detail);
+                                        ip, port, detail, cmd);
   case 16:
     return dispatch_fuzzylinf_pre<65536>(d, delta, target_matching_points,
-                                         trait, ip, port, detail);
+                                         trait, ip, port, detail, cmd);
   default:
     spdlog::error("Unsupported -n {}. Supported values: 8, 12, 16", n);
     return 1;
