@@ -31,6 +31,8 @@ RUN apt-get update && \
     jq && \
     rm -rf /var/lib/apt/lists/*
 
+RUN curl -sSL https://raw.githubusercontent.com/thombashi/tcconfig/master/scripts/installer.sh | bash
+
 # Install third-party dependencies at the revisions pinned by the script.
 COPY --chmod=755 ./install-dependencies-in-container.sh /workspace/install-dependencies-in-container.sh
 RUN ./install-dependencies-in-container.sh
