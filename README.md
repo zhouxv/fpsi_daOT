@@ -1,53 +1,64 @@
-# Fuzzy PSI
+# Distance-Aware OT with Application to Fuzzy PSI
 
 This project implements the Fuzzy PSI protocols presented in [Distance-Aware OT with Application to Fuzzy PSI](https://eprint.iacr.org/2025/996).
 
-## Legacy Catch2 Benchmarks
+## Build and Run with Docker
 
-When built, the Catch2 executables are located in the project's `build` directory. The following benchmark executables are available:
-
-| Protocol | Executable Name |
-|----------|-----------------|
-| L∞ Fuzzy PSI | `fuzzylinf_bench` |
-| L1 Fuzzy PSI | `fuzzyl1_bench` |
-| L2 Fuzzy PSI | `fuzzyl2_bench` |
-
-### Catch2 Usage
-
-All benchmarks are implemented using the [Catch2](https://github.com/catchorg/Catch2) C++ library. Below are common ways to run and control the benchmarks.
-
-### List All Available Tests
+Run the following from this repository's root directory, which contains the
+`Dockerfile`. The build installs dependencies and compiles `build/main`;
+no prebuilt FPSI image is required.
 
 ```bash
-./fuzzylinf_bench --list-tests
+docker build -t fpsi_cmp_artifact_exp12:latest .
+docker run -d --cap-add=NET_ADMIN \
+  --name fpsi_cmp_exp12 \
+  fpsi_cmp_artifact_exp12:latest \
+  sleep infinity
+docker exec -it fpsi_cmp_exp12 bash
 ```
 
-### Specify Number of Samples
+The container's project directory is `/workspace`, not `/home`, and the
+executable is `/workspace/build/main`. Run the benchmark commands below
+inside this container. `NET_ADMIN` is needed for LAN/WAN network
+configuration. Building requires internet access to download dependencies;
+pushing an image to a registry is not required.
+
+## Artifact comparison benchmarks (Exp12)
+
+This is the da-ROT-based fuzzy PSI baseline (Exp12) for the comparison
+artifact. After building `build/main`, run the following from the project
+root. These commands use the artifact driver, not the legacy Catch2
+benchmarks below.
 
 ```bash
-# Run each benchmark 3 times
-./fuzzylinf_bench --benchmark-samples 3
+./shell_config_network.sh lan
+./shell_run_bench_fpsi.sh
+./shell_run_bench_fpsi.sh --preset full
 ```
 
-### Run a Specific Test Case
+Quick is the default and is equivalent to `--preset quick`. The presets
+match the camera-ready comparison paper's thresholds:
+
+| Parameter | Quick | Full |
+|---|---|---|
+| Metrics | Linf, L1, L2 | Linf, L1, L2 |
+| Set size N | 2^12 | 2^8, 2^12, 2^16 |
+| Dimension d | 2, 6, 10 (L2: 2 only) | 2, 6, 10 (L2: 2 only) |
+| Threshold delta | 60, 250 | 60, 250 |
+| Trials per combination | 1 | 3 |
+| Supported combinations | 14 | 42 |
+
+L2 cases with d > 2 are skipped and produce no CSV rows. Both LAN (10 Gbps,
+no added delay) and WAN (100 Mbps, 80 ms target RTT) are paper settings.
+Repeat the comparisons under WAN using the same profile for all projects:
 
 ```bash
-# Use the test name as an argument to run a specific benchmark
-# L∞ 
-./fuzzylinf_bench --benchmark-samples 1 "fuzzylinf(n=256 m=256 d=6 delta=10)"
-
-# L1 
-./fuzzyl1_bench --benchmark-samples 1 "fuzzyl1(n=4096 m=4096 d=6 delta=10)"
+./shell_config_network.sh wan
+./shell_run_bench_fpsi.sh --preset quick
+./shell_run_bench_fpsi.sh --preset full
 ```
 
-### Show Success Details (-s or --success)
-
-By default, Catch2 only displays details for failing tests. Use -s (short for --success) to also show detailed output for successful tests, including benchmark results and SUCCEED() messages:
-
-```bash
-# Show detailed output for all tests (including successful ones)
-./fuzzylinf_bench -s --benchmark-samples 1 "fuzzylinf(n=256 m=256 d=6 delta=10)"
-
-# Equivalent to above
-./fuzzylinf_bench --success --benchmark-samples 1 "fuzzylinf(n=256 m=256 d=6 delta=10)"
-```
+Use `./shell_run_bench_fpsi.sh --help` and `./shell_config_network.sh --help`
+for options. Explicit experiment options override preset values, for example
+`./shell_run_bench_fpsi.sh --preset full --nn 12 16`. Network configuration
+requires root/sudo locally or `NET_ADMIN` in a container.

@@ -27,21 +27,21 @@ The network is configured separately with shell_config_network.sh. This script
 detects the current tcconfig settings and prints them before the benchmark.
 
 Presets:
-  full   Complete paper matrix, 63 supported cases and 3 trials per case
+  full   Complete paper matrix, 42 supported cases and 3 trials per case
   quick  Representative Table 2 subset, 14 supported cases and 1 trial per case (default)
 
 Full matrix:
   metric = 0 1 2          (0=Linf, 1=L1, 2=L2)
   nn     = 8 12 16        (set size N=2^nn)
   dim    = 2 6 10
-  delta  = 10 60 250
+  delta  = 60 250
   trials = 3
 
 Quick matrix:
   metric = 0 1 2
   nn     = 12
   dim    = 2 6 10
-  delta  = 10 250
+  delta  = 60 250
   trials = 1
 
 L2 supports only d=2; L2 cases with other dimensions are skipped.
@@ -75,7 +75,7 @@ while [[ $# -gt 0 ]]; do
       option="$1"
       shift
       values=()
-      # Collect values until the next option, e.g. --dim 2 6 10 --delta 10.
+      # Collect values until the next option, e.g. --dim 2 6 10 --delta 60.
       while [[ $# -gt 0 && "$1" != -* ]]; do
         values+=("$1")
         shift
@@ -124,12 +124,12 @@ done
 case "${preset}" in
   full)
     default_ns=(8 12 16)
-    default_deltas=(10 60 250)
+    default_deltas=(60 250)
     default_trials=3
     ;;
   quick)
     default_ns=(12)
-    default_deltas=(10 250)
+    default_deltas=(60 250)
     default_trials=1
     ;;
   *)
