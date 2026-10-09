@@ -9,10 +9,10 @@ Run the following from this repository's root directory, which contains the
 no prebuilt FPSI image is required.
 
 ```bash
-docker build -t fpsi_cmp_artifact_exp12:latest .
+docker build -t blueobsidian/fpsi_cmp_artifact:exp12_daot .
 docker run -d --cap-add=NET_ADMIN \
   --name fpsi_cmp_exp12 \
-  fpsi_cmp_artifact_exp12:latest \
+  blueobsidian/fpsi_cmp_artifact:exp12_daot \
   sleep infinity
 docker exec -it fpsi_cmp_exp12 bash
 ```
